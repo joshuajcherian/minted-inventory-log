@@ -81,8 +81,8 @@ st.markdown(
       .minted-hero {{
         position: relative;
         background:
-          radial-gradient(circle at 85% 20%, rgba(255, 204, 8, 0.18) 0%, transparent 45%),
-          linear-gradient(150deg, {DEEP_GREEN} 0%, #143324 60%, {BRAND_GREEN} 130%);
+          radial-gradient(circle at 88% 22%, rgba(255, 204, 8, 0.18) 0%, transparent 48%),
+          linear-gradient(160deg, #0F5C39 0%, {BRAND_GREEN} 55%, #1A8554 100%);
         color: #FFFFFF;
         padding: 34px 36px 30px;
         border-radius: 18px;
@@ -97,14 +97,29 @@ st.markdown(
         height: 6px;
         background: {GOLD};
       }}
+
+      /* Nuke Streamlit's default image chrome inside the hero so a
+         transparent PNG never picks up a dark fill from the theme. */
+      .minted-hero img,
+      .minted-hero picture,
+      .minted-hero figure,
+      .minted-hero [data-testid="stImage"],
+      .minted-hero [data-testid="stMarkdownContainer"] img {{
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        border: 0 !important;
+        outline: 0 !important;
+        padding: 0 !important;
+        filter: none !important;
+      }}
+
       .minted-hero-logo {{
         display: block;
         max-height: 64px;
         width: auto;
         margin-bottom: 18px;
-        background: transparent !important;
-        box-shadow: none !important;
-        border: none !important;
       }}
       .minted-hero h1 {{
         font-family: 'Inter', system-ui, sans-serif;
