@@ -193,7 +193,7 @@ st.markdown(
     """
     <div class="minted-header">
       <h1>Minted — Inventory Log Generator</h1>
-      <p>Drop a Shopify export · Get a branded count workbook</p>
+      <p>Upload the inventory CSV from Shopify (email export) · Download your count workbook</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -205,10 +205,20 @@ st.markdown(
 st.markdown(
     """
     <div class="step-card">
-      <h3>1. Export your inventory from Shopify</h3>
-      <p>Shopify Admin → <b>Products → Inventory</b> → click <b>Export</b> →
-         choose <i>CSV for Excel, Numbers or other spreadsheet programs</i>.
-         Save the CSV anywhere on your computer.</p>
+      <h3>1. Export inventory from Shopify</h3>
+      <p style="margin-bottom:14px; color:#1A1A1A; font-size:0.95rem;">
+        Follow these steps so the CSV matches what this tool expects.
+      </p>
+      <ol style="margin:0 0 0 1.1rem; padding:0; color:#1A1A1A; font-size:0.92rem; line-height:1.65;">
+        <li style="margin-bottom:10px;">Open <b>Shopify Admin</b> → <b>Products</b> → <b>Inventory</b>.</li>
+        <li style="margin-bottom:10px;">At the <b>top left</b>, next to <b>Inventory</b>, open the <b>location</b> dropdown and select the store you’re exporting for.</li>
+        <li style="margin-bottom:10px;">Click <b>Export</b>.</li>
+        <li style="margin-bottom:10px;">In the export options, choose the scope Shopify shows you — e.g. <b>All states</b> or <b>Export inventory from your location</b> — so it lines up with that location.</li>
+        <li style="margin-bottom:10px;">For <b>Inventory state shown</b>, set it to <b>All states</b>.</li>
+        <li style="margin-bottom:10px;">Choose <b>Export all variants</b>.</li>
+        <li style="margin-bottom:10px;">Set the format to <b>CSV for Excel, Numbers, or other spreadsheet programs</b>.</li>
+        <li style="margin-bottom:0;">Click <b>Export</b> again to start. Shopify <b>emails</b> you when the file is ready — usually within <b>about 5 minutes</b>. Download the CSV from that email, then upload it below.</li>
+      </ol>
     </div>
     """,
     unsafe_allow_html=True,
@@ -221,7 +231,7 @@ st.markdown(
     """
     <div class="step-card">
       <h3>2. Upload the CSV below</h3>
-      <p>You can drag it from Finder/Explorer right into the box.</p>
+      <p>You can drag the CSV from your desktop or Downloads — it’s usually the file Shopify emailed you.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -238,8 +248,6 @@ if "inv_export_location" not in st.session_state:
     st.session_state["inv_export_location"] = ""
 if "inv_export_date" not in st.session_state:
     st.session_state["inv_export_date"] = date.today()
-if "inv_export_label" not in st.session_state:
-    st.session_state["inv_export_label"] = "Daily Inventory Log"
 
 show_naming = uploaded is not None or "xlsx_bytes" in st.session_state
 
@@ -248,7 +256,9 @@ if show_naming:
         f"""
         <div class="step-card" style="border-left: 3px solid {DEEP_GREEN};">
           <h3>Name your download</h3>
-          <p>These appear in the <b>.xlsx</b> file name: location, date, then your chosen label.</p>
+          <p>We’ll save the workbook as <b>Location</b> + <b>date</b> +
+             <code style="font-size:0.85em;">_Daily_Inventory_Log.xlsx</code> — e.g.
+             <code style="font-size:0.85em;">Dacula_2026-05-13_Daily_Inventory_Log.xlsx</code>.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -263,13 +273,6 @@ if show_naming:
         "Date on the file",
         key="inv_export_date",
         help="Usually today, or the day of this count / export.",
-    )
-    st.radio(
-        "Ending label",
-        ["Daily Inventory Log", "Inventory Log"],
-        horizontal=True,
-        key="inv_export_label",
-        help='File ends in “…_Daily_Inventory_Log.xlsx” or “…_Inventory_Log.xlsx”.',
     )
 
 # --- Step 3: Build --------------------------------------------------------
@@ -356,10 +359,7 @@ if "xlsx_bytes" in st.session_state:
         exp_date = exp_date.date()
     if not isinstance(exp_date, date):
         exp_date = date.today()
-    daily = (
-        st.session_state.get("inv_export_label", "Inventory Log") == "Daily Inventory Log"
-    )
-    filename = build_inventory_download_filename(loc_raw, exp_date, daily_log=daily)
+    filename = build_inventory_download_filename(loc_raw, exp_date)
     st.caption(f"Download file: `{filename}`")
     st.download_button(
         label="⬇  Download workbook",

@@ -36,6 +36,17 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 # --- Singles vs Sealed classifier -----------------------------------------
 
+def print_progress(iteration, total, prefix='', suffix='', decimals=1, length=40, fill='█'):
+    if total == 0:
+        return
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filled_length = int(length * iteration // total)
+    bar = fill * filled_length + '-' * (length - filled_length)
+    sys.stdout.write(f'\r{prefix} |{bar}| {percent}% {suffix}')
+    sys.stdout.flush()
+    if iteration == total:
+        sys.stdout.write('\n')
+
 CARD_NUM_RE = re.compile(r"\b\d{1,4}\s*/\s*\d{1,4}\b")
 GRADE_RE = re.compile(r"\b(PSA|BGS|CGC|SGC|HGA|GMA)\s*\d", re.IGNORECASE)
 PROMO_CODE_RE = re.compile(
@@ -175,16 +186,10 @@ def sanitize_filename_part(raw: str) -> str:
     return s or "Location_unknown"
 
 
-def build_inventory_download_filename(
-    location: str,
-    export_date: date,
-    *,
-    daily_log: bool,
-) -> str:
-    """Build download name: ``{Location}_{YYYY-MM-DD}_{Inventory_Log}.xlsx``."""
+def build_inventory_download_filename(location: str, export_date: date) -> str:
+    """Build download name: ``{Location}_{YYYY-MM-DD}_Daily_Inventory_Log.xlsx``."""
     loc = sanitize_filename_part(location)
-    tail = "Daily_Inventory_Log" if daily_log else "Inventory_Log"
-    return f"{loc}_{export_date:%Y-%m-%d}_{tail}.xlsx"
+    return f"{loc}_{export_date:%Y-%m-%d}_Daily_Inventory_Log.xlsx"
 
 
 def find_inventory_csv() -> Path:
@@ -464,12 +469,15 @@ def build_active_inventory(
     # Caller has already filtered to the relevant category. Sort alphabetically.
     active = list(rows)
     active.sort(key=lambda r: (r["title"].lower(), r["variant"].lower()))
+    total_active = len(active)
 
     first_data_row = header_row + 1
     for idx, r in enumerate(active, start=1):
+        if idx % 100 == 0 or idx == total_active:
+            print_progress(idx, total_active, prefix=f"  {sheet_name} rows")
         rr = first_data_row + idx - 1
         ws.cell(row=rr, column=1, value=idx)               # A: #
-        ws.cell(row=rr, column=2, value="No")               # B: Counted?
+        ws.cell(row=rr, column=2, value=f'=IF(H{rr}="","No","Yes")')  # B: Counted?
         ws.cell(row=rr, column=3, value=r["game"])          # C: Game
         ws.cell(row=rr, column=4, value=r["title"])         # D: Product
         ws.cell(row=rr, column=5, value=r["variant"])       # E: Variant
@@ -498,7 +506,7 @@ def build_active_inventory(
     last_total_row = last_data_row + pad
     for rr in range(last_data_row + 1, last_total_row + 1):
         ws.cell(row=rr, column=1, value=f"=IF(D{rr}=\"\",\"\",MAX($A${first_data_row}:A{rr - 1})+1)")
-        ws.cell(row=rr, column=2, value="No")
+        ws.cell(row=rr, column=2, value=f'=IF(H{rr}="","No","Yes")')
         ws.cell(row=rr, column=9, value=f'=IF(OR(G{rr}="",H{rr}=""),"",H{rr}-G{rr})')
         ws.cell(
             row=rr,
@@ -515,6 +523,7 @@ def build_active_inventory(
     # Style every cell in the body
     left_cols = {3, 4, 5, 13}  # Game, Product, Variant, Notes
     for rr in range(first_data_row, last_total_row + 1):
+        ws.row_dimensions[rr].height = 30
         for cc in range(1, len(ACTIVE_HEADERS) + 1):
             cell = ws.cell(row=rr, column=cc)
             align = "left" if cc in left_cols else "center"
@@ -558,7 +567,7 @@ def build_active_inventory(
     table_ref = f"A{header_row}:{end_col_letter}{last_total_row}"
     tbl = Table(displayName=table_name, ref=table_ref)
     tbl.tableStyleInfo = TableStyleInfo(
-        name="TableStyleLight15",
+        name="TableStyleLight1",
         showFirstColumn=False,
         showLastColumn=False,
         showRowStripes=True,
@@ -566,11 +575,17 @@ def build_active_inventory(
     )
     ws.add_table(tbl)
 
-    dv_counted = DataValidation(type="list", formula1='"Yes,No"', allow_blank=True)
-    dv_counted.add(f"B{first_data_row}:B{last_total_row}")
-    ws.add_data_validation(dv_counted)
+    # Conditional formatting on Status column J and Counted column B
+    counted_range = f"B{first_data_row}:B{last_total_row}"
+    ws.conditional_formatting.add(
+        counted_range,
+        CellIsRule(operator="equal", formula=['"Yes"'], fill=fill(SUCCESS_BG), font=Font(name=BODY_FONT, size=10, bold=True, color=SUCCESS_FG)),
+    )
+    ws.conditional_formatting.add(
+        counted_range,
+        CellIsRule(operator="equal", formula=['"No"'], fill=fill(DANGER_BG), font=Font(name=BODY_FONT, size=10, bold=True, color=DANGER_FG)),
+    )
 
-    # Conditional formatting on Status column J
     status_range = f"J{first_data_row}:J{last_total_row}"
     ws.conditional_formatting.add(
         status_range,
@@ -678,9 +693,12 @@ def build_full_catalog(wb: Workbook, rows: list[dict], logo: Path) -> None:
     style_header_row(ws, header_row, len(CATALOG_HEADERS))
 
     rows_sorted = sorted(rows, key=lambda r: (-r["on_hand"], r["title"].lower(), r["variant"].lower()))
+    total_rows = len(rows_sorted)
 
     first_data_row = header_row + 1
     for i, r in enumerate(rows_sorted, start=0):
+        if i % 1000 == 0 or i == total_rows - 1:
+            print_progress(i + 1, total_rows, prefix="  Catalog data")
         rr = first_data_row + i
         ws.cell(row=rr, column=1, value=r["category"])
         ws.cell(row=rr, column=2, value=r["game"])
@@ -701,10 +719,15 @@ def build_full_catalog(wb: Workbook, rows: list[dict], logo: Path) -> None:
     center_align = Alignment(horizontal="center", vertical="center")
     left_cols = {3, 4, 6}  # Product, Variant, Handle
     for rr in range(first_data_row, last_data_row + 1):
+        ws.row_dimensions[rr].height = 25
+        bg_color = "FFF9FAFB" if rr % 2 == 0 else WHITE
+        if (rr - first_data_row) % 1000 == 0 or rr == last_data_row:
+            print_progress(rr - first_data_row + 1, last_data_row - first_data_row + 1, prefix="  Catalog styles")
         for cc in range(1, len(CATALOG_HEADERS) + 1):
             cell = ws.cell(row=rr, column=cc)
             cell.font = body_font
             cell.alignment = left_align if cc in left_cols else center_align
+            cell.fill = fill(bg_color)
 
     # Game color chip per row (column B)
     for i, r in enumerate(rows_sorted, start=0):
@@ -890,10 +913,13 @@ def build_discrepancy_log(
                 ws.cell(row=rr, column=start_col + off, value=formula)
 
         for rr in range(first_slot, last_slot + 1):
+            ws.row_dimensions[rr].height = 30
+            bg_color = "FFF9FAFB" if rr % 2 == 0 else WHITE
             for off in range(len(headers)):
                 cc = start_col + off
                 align = "left" if off in (0, 1, 7) else "center"
                 cell = ws.cell(row=rr, column=cc)
+                cell.fill = fill(bg_color)
                 style_data_cell(cell, align=align, bold=(off == 6))
             ws.cell(row=rr, column=start_col + 3).number_format = "#,##0;-#,##0;0;@"
             ws.cell(row=rr, column=start_col + 4).number_format = "#,##0;-#,##0;0;@"
