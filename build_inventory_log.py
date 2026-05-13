@@ -289,8 +289,8 @@ def banner(ws, title: str, subtitle: str, end_col_letter: str, logo_path: Path |
             pass
 
 
-def style_header_row(ws, row: int, columns: int) -> None:
-    for c in range(1, columns + 1):
+def style_header_row(ws, row: int, columns: int, *, start_column: int = 1) -> None:
+    for c in range(start_column, start_column + columns):
         cell = ws.cell(row=row, column=c)
         cell.fill = fill(DEEP_GREEN)
         cell.font = Font(name=BODY_FONT, size=10, bold=True, color=WHITE)
@@ -736,6 +736,9 @@ def build_discrepancy_log(
 ) -> None:
     """Auto-compacted discrepancy report.
 
+    Singles and Sealed appear **side by side** (cols A–H and J–Q) so both lists
+    are visible without scrolling from one block to the other.
+
     Uses INDEX/SMALL against hidden helper columns on each count sheet so only
     populated rows appear (no empty mirror rows to filter past).
 
@@ -745,15 +748,23 @@ def build_discrepancy_log(
     ws.sheet_view.showGridLines = False
 
     widths = [44, 26, 18, 13, 13, 13, 24, 30]
+    SINGLES_START = 1
+    SEALED_START = 10
+    SPACER = 9
+    last_sheet_col = SEALED_START + len(widths) - 1  # 17
+    end_sheet_col = get_column_letter(last_sheet_col)
+
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(i)].width = w
+    ws.column_dimensions[get_column_letter(SPACER)].width = 3
+    for j in range(SEALED_START, last_sheet_col + 1):
+        ws.column_dimensions[get_column_letter(j)].width = widths[j - SEALED_START]
 
-    end_col_letter = get_column_letter(len(widths))
     banner(
         ws,
         "MINTED — DISCREPANCY LOG",
         "Auto-compacted · Only items needing attention show up here",
-        end_col_letter,
+        end_sheet_col,
         logo,
     )
 
@@ -761,21 +772,20 @@ def build_discrepancy_log(
     ws.row_dimensions[6].height = 22
     ws.row_dimensions[7].height = 40
 
-    # Compute helper-column ranges (column N on each source sheet)
-    # so the tiles count discrepancies live.
     helper_ranges: dict[str, str] = {}
     for label, sheet_name, first_row, last_row in sources:
         helper_ranges[label] = f"'{sheet_name}'!$N${first_row}:$N${last_row}"
 
     singles_helper = helper_ranges.get("Single", "")
     sealed_helper = helper_ranges.get("Sealed", "")
-    # Total discrepancies = count of numeric values across BOTH helper columns
     total_formula = (
         f"=COUNT({singles_helper})+COUNT({sealed_helper})"
         if singles_helper and sealed_helper
+        else f"=COUNT({singles_helper or sealed_helper})"
+        if (singles_helper or sealed_helper)
         else "=0"
     )
-    # MISSING count per sheet via COUNTIF on the Status column (J)
+
     singles_status = ""
     sealed_status = ""
     for label, sheet_name, first_row, last_row in sources:
@@ -814,115 +824,123 @@ def build_discrepancy_log(
         val_cell.border = BORDER_ALL
         ws.merge_cells(start_row=7, start_column=start_col, end_row=7, end_column=end_col)
 
-    # Instruction strip
     ws.row_dimensions[9].height = 22
     note = ws.cell(
         row=9,
         column=1,
         value=(
-            "Lists below auto-compact — only items needing attention appear. "
+            "Singles (left) and Sealed (right) · Lists auto-compact — only items needing attention appear. "
             "Fix mismatches by updating PHYSICAL COUNT on the Singles Count or Sealed Count tab."
         ),
     )
     note.font = Font(name=BODY_FONT, size=10, italic=True, color=DEEP_GREEN)
     note.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     note.fill = fill(MINT_SOFT)
-    ws.merge_cells(start_row=9, start_column=1, end_row=9, end_column=len(widths))
+    ws.merge_cells(start_row=9, start_column=1, end_row=9, end_column=last_sheet_col)
 
-    # --- Column mapping for INDEX lookups ---------------------------------
     headers = [
-        "Product",     # A
-        "Variant",     # B
-        "SKU",         # C
-        "System",      # D
-        "Physical",    # E
-        "Difference",  # F
-        "Status",      # G
-        "Notes",       # H
+        "Product",
+        "Variant",
+        "SKU",
+        "System",
+        "Physical",
+        "Difference",
+        "Status",
+        "Notes",
     ]
-    # Source column letter on Singles/Sealed Count for each header
     source_letters = ["D", "E", "F", "G", "H", "I", "J", "M"]
 
-    current_row = 11  # we'll grow downward as we add sections
+    SECTION_TITLE_ROW = 11
 
-    def write_section(label: str, sheet_name: str, first_row: int, last_row: int) -> None:
-        """Write one section (Singles or Sealed) with INDEX/SMALL formulas."""
-        nonlocal current_row
-
+    def write_section(
+        label: str, sheet_name: str, first_row: int, last_row: int, start_col: int
+    ) -> None:
+        end_col = start_col + len(headers) - 1
         helper_range = f"'{sheet_name}'!$N${first_row}:$N${last_row}"
 
-        # Section title row with live count
-        title_row = current_row
-        ws.row_dimensions[title_row].height = 26
+        ws.row_dimensions[SECTION_TITLE_ROW].height = 26
         title_cell = ws.cell(
-            row=title_row,
-            column=1,
+            row=SECTION_TITLE_ROW,
+            column=start_col,
             value=f'="{label.upper()} — "&COUNT({helper_range})&" OPEN"',
         )
         title_cell.font = Font(name=DISPLAY_FONT, size=12, bold=True, color=WHITE)
         title_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
         title_cell.fill = fill(DEEP_GREEN)
-        ws.merge_cells(start_row=title_row, start_column=1, end_row=title_row, end_column=len(headers))
+        ws.merge_cells(
+            start_row=SECTION_TITLE_ROW,
+            start_column=start_col,
+            end_row=SECTION_TITLE_ROW,
+            end_column=end_col,
+        )
 
-        # Column header row
-        header_row = title_row + 1
-        for i, h in enumerate(headers, start=1):
-            ws.cell(row=header_row, column=i, value=h)
-        style_header_row(ws, header_row, len(headers))
+        header_row = SECTION_TITLE_ROW + 1
+        for i, h in enumerate(headers):
+            ws.cell(row=header_row, column=start_col + i, value=h)
+        style_header_row(ws, header_row, len(headers), start_column=start_col)
 
-        # Data slot rows
         first_slot = header_row + 1
         last_slot = first_slot + slots_per_section - 1
-        for slot, rr in enumerate(range(first_slot, last_slot + 1), start=1):
-            for col_idx, src_letter in enumerate(source_letters, start=1):
+        for rr in range(first_slot, last_slot + 1):
+            for off, src_letter in enumerate(source_letters):
                 src_range = f"'{sheet_name}'!${src_letter}${first_row}:${src_letter}${last_row}"
                 formula = (
                     f'=IFERROR(INDEX({src_range},SMALL({helper_range},ROW()-{first_slot - 1})),"")'
                 )
-                ws.cell(row=rr, column=col_idx, value=formula)
+                ws.cell(row=rr, column=start_col + off, value=formula)
 
-        # Style slot rows
         for rr in range(first_slot, last_slot + 1):
-            for cc in range(1, len(headers) + 1):
-                align = "left" if cc in (1, 2, 8) else "center"
+            for off in range(len(headers)):
+                cc = start_col + off
+                align = "left" if off in (0, 1, 7) else "center"
                 cell = ws.cell(row=rr, column=cc)
-                style_data_cell(cell, align=align, bold=(cc == 7))
-            ws.cell(row=rr, column=4).number_format = "#,##0;-#,##0;0;@"
-            ws.cell(row=rr, column=5).number_format = "#,##0;-#,##0;0;@"
-            ws.cell(row=rr, column=6).number_format = "+#,##0;-#,##0;0;@"
+                style_data_cell(cell, align=align, bold=(off == 6))
+            ws.cell(row=rr, column=start_col + 3).number_format = "#,##0;-#,##0;0;@"
+            ws.cell(row=rr, column=start_col + 4).number_format = "#,##0;-#,##0;0;@"
+            ws.cell(row=rr, column=start_col + 5).number_format = "+#,##0;-#,##0;0;@"
 
-        # Conditional formatting on Status column G + Difference F
-        status_range = f"G{first_slot}:G{last_slot}"
-        ws.conditional_formatting.add(
-            status_range,
-            FormulaRule(formula=[f'ISNUMBER(SEARCH("Discrepancy",G{first_slot}))'],
-                        fill=fill(DANGER_BG),
-                        font=Font(name=BODY_FONT, size=10, bold=True, color=DANGER_FG)),
-        )
-        ws.conditional_formatting.add(
-            status_range,
-            FormulaRule(formula=[f'ISNUMBER(SEARCH("MISSING",G{first_slot}))'],
-                        fill=fill(DANGER_BG),
-                        font=Font(name=BODY_FONT, size=10, bold=True, color=DANGER_FG)),
-        )
-        diff_range = f"F{first_slot}:F{last_slot}"
-        ws.conditional_formatting.add(
-            diff_range,
-            CellIsRule(operator="lessThan", formula=["0"], fill=fill(DANGER_BG),
-                       font=Font(name=BODY_FONT, size=10, bold=True, color=DANGER_FG)),
-        )
-        ws.conditional_formatting.add(
-            diff_range,
-            CellIsRule(operator="greaterThan", formula=["0"], fill=fill(WARN_BG),
-                       font=Font(name=BODY_FONT, size=10, bold=True, color=WARN_FG)),
+        st_l = get_column_letter(start_col + 6)
+        df_l = get_column_letter(start_col + 5)
+        top_r = first_slot
+        full_rng = (
+            f"{get_column_letter(start_col)}{first_slot}:"
+            f"{get_column_letter(end_col)}{last_slot}"
         )
 
-        current_row = last_slot + 2  # leave a blank row between sections
+        # Full-row color: red = missing / short / negative diff; green = over / surplus / OK.
+        red_rule = FormulaRule(
+            formula=[
+                f'=AND(${st_l}{top_r}<>"",OR('
+                f'ISNUMBER(SEARCH("MISSING",${st_l}{top_r})),'
+                f'ISNUMBER(SEARCH("SHORT",${st_l}{top_r})),'
+                f'IFERROR(${df_l}{top_r}<0,FALSE)))'
+            ],
+            fill=fill(DANGER_BG),
+            font=Font(name=BODY_FONT, size=10, bold=True, color=DANGER_FG),
+        )
+        green_rule = FormulaRule(
+            formula=[
+                f'=AND(${st_l}{top_r}<>"",OR('
+                f'ISNUMBER(SEARCH("OVER",${st_l}{top_r})),'
+                f'ISNUMBER(SEARCH("OK - Match",${st_l}{top_r})),'
+                f'IFERROR(${df_l}{top_r}>0,FALSE)))'
+            ],
+            fill=fill(SUCCESS_BG),
+            font=Font(name=BODY_FONT, size=10, bold=True, color=SUCCESS_FG),
+        )
+        ws.conditional_formatting.add(full_rng, red_rule)
+        ws.conditional_formatting.add(full_rng, green_rule)
 
-    for label, sheet_name, first_row, last_row in sources:
-        write_section(label, sheet_name, first_row, last_row)
+    by_label = {lbl: (sn, fr, lr) for lbl, sn, fr, lr in sources}
+    if "Single" in by_label:
+        sn, fr, lr = by_label["Single"]
+        write_section("Single", sn, fr, lr, SINGLES_START)
+    if "Sealed" in by_label:
+        sn, fr, lr = by_label["Sealed"]
+        write_section("Sealed", sn, fr, lr, SEALED_START)
 
-    ws.freeze_panes = ws.cell(row=11, column=1)
+    data_start_row = SECTION_TITLE_ROW + 2
+    ws.freeze_panes = f"A{data_start_row}"
     ws.sheet_properties.tabColor = "FFE0B4B4"
 
 
