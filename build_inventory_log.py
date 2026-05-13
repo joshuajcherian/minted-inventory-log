@@ -278,7 +278,7 @@ def banner(ws, title: str, subtitle: str, end_col_letter: str, logo_path: Path |
     last_col = column_index_from_string(end_col_letter)
     for r in (1, 2, 3):
         for c in range(1, last_col + 1):
-            ws.cell(row=r, column=c).fill = fill(DEEP_GREEN)
+            ws.cell(row=r, column=c).fill = fill(BRAND_PRIMARY)
 
     ws.row_dimensions[4].height = 4
     for c in range(1, last_col + 1):
@@ -299,7 +299,7 @@ def banner(ws, title: str, subtitle: str, end_col_letter: str, logo_path: Path |
 def style_header_row(ws, row: int, columns: int, *, start_column: int = 1) -> None:
     for c in range(start_column, start_column + columns):
         cell = ws.cell(row=row, column=c)
-        cell.fill = fill(DEEP_GREEN)
+        cell.fill = fill(BRAND_PRIMARY)
         cell.font = Font(name=BODY_FONT, size=10, bold=True, color=WHITE)
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = BORDER_ALL
@@ -827,7 +827,7 @@ def build_discrepancy_log(
     )
 
     tile_specs = [
-        ("TOTAL OPEN DISCREPANCIES", total_formula,         DEEP_GREEN, WHITE),
+        ("TOTAL OPEN DISCREPANCIES", total_formula,         BRAND_PRIMARY, WHITE),
         ("SINGLES DISCREPANCIES",     f"=COUNT({singles_helper})" if singles_helper else "=0", MINT, DEEP_GREEN),
         ("SEALED DISCREPANCIES",      f"=COUNT({sealed_helper})"  if sealed_helper  else "=0", MINT, DEEP_GREEN),
         ("MISSING ON SHELF",          missing_formula,       DANGER_BG, DANGER_FG),
@@ -891,7 +891,7 @@ def build_discrepancy_log(
         )
         title_cell.font = Font(name=DISPLAY_FONT, size=12, bold=True, color=WHITE)
         title_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-        title_cell.fill = fill(DEEP_GREEN)
+        title_cell.fill = fill(BRAND_PRIMARY)
         ws.merge_cells(
             start_row=SECTION_TITLE_ROW,
             start_column=start_col,
@@ -1001,7 +1001,7 @@ def _stat_tile(ws, row_label: int, col: int, *, label: str, value, bg: str, fg: 
 def _section_header(ws, row: int, col: int, span: int, label: str) -> None:
     ws.row_dimensions[row].height = 22
     cell = ws.cell(row=row, column=col, value=label)
-    cell.fill = fill(DEEP_GREEN)
+    cell.fill = fill(BRAND_PRIMARY)
     cell.font = Font(name=BODY_FONT, size=11, bold=True, color=WHITE)
     cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col + span - 1)
@@ -1046,7 +1046,7 @@ def build_dashboard(
 
     # Overview row: snapshot totals
     _section_header(ws, 8, 2, 6, "OVERVIEW")
-    _stat_tile(ws, 9, 2, label="TOTAL SKUS",      value=f"{total_skus:,}",        bg=DEEP_GREEN, fg=WHITE)
+    _stat_tile(ws, 9, 2, label="TOTAL SKUS",      value=f"{total_skus:,}",        bg=BRAND_PRIMARY, fg=WHITE)
     _stat_tile(ws, 9, 4, label="ITEMS WITH STOCK", value=f"{singles_stocked + sealed_stocked:,}", bg=MINT, fg=DEEP_GREEN)
     _stat_tile(ws, 9, 6, label="SINGLES STOCKED",  value=f"{singles_stocked:,}",   bg=MINT, fg=DEEP_GREEN)
 
@@ -1061,7 +1061,7 @@ def build_dashboard(
         _stat_tile(ws, start_row + 1, 2,
                    label="UNITS IN SYSTEM",
                    value=f"=SUM({system_range})", is_formula=True,
-                   bg=DEEP_GREEN, fg=WHITE)
+                   bg=BRAND_PRIMARY, fg=WHITE)
         _stat_tile(ws, start_row + 1, 4,
                    label="UNITS COUNTED",
                    value=f"=SUMIF({physical_range},\">=0\")", is_formula=True,
