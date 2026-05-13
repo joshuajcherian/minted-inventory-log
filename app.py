@@ -40,6 +40,23 @@ def _logo_data_uri(filename: str) -> str | None:
     return f"data:image/png;base64,{b64}"
 
 
+def _is_dev_environment() -> bool:
+    """True on the *-dev.streamlit.app subdomain or when running locally,
+    so the DEV badge auto-hides on prod URLs without any branch-specific
+    code to maintain."""
+    try:
+        host = st.context.headers.get("Host", "") or ""
+    except Exception:
+        host = ""
+    host = host.lower()
+    return (
+        "-dev." in host
+        or host.startswith("localhost")
+        or host.startswith("127.")
+        or host.startswith("0.0.0.0")
+    )
+
+
 # --- Page setup -----------------------------------------------------------
 
 st.set_page_config(
@@ -297,10 +314,34 @@ st.markdown(
         color: {MUTED};
       }}
       .footer .dot {{ color: {GOLD}; padding: 0 6px; }}
+
+      /* DEV-only badge — auto-hides on the prod URL via _is_dev_environment(). */
+      .dev-badge {{
+        position: fixed;
+        top: 12px;
+        right: 14px;
+        z-index: 9999;
+        background: {GOLD};
+        color: {DEEP_GREEN};
+        font-family: {DISPLAY_STACK};
+        font-weight: 900;
+        font-size: 0.72rem;
+        letter-spacing: 0.18em;
+        padding: 6px 12px;
+        border-radius: 999px;
+        box-shadow: 0 6px 18px -6px rgba(12, 31, 24, 0.45);
+        border: 1px solid rgba(12, 31, 24, 0.18);
+      }}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+# --- DEV badge (auto-hidden on prod) --------------------------------------
+
+if _is_dev_environment():
+    st.markdown('<div class="dev-badge">DEV</div>', unsafe_allow_html=True)
 
 
 # --- Hero -----------------------------------------------------------------
