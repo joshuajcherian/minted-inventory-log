@@ -162,6 +162,31 @@ LOGO_PATH: Path | None = _find_logo()
 OUTPUT_PATH = ROOT / "Minted_Inventory_Log.xlsx"
 
 
+_FILENAME_UNSAFE = re.compile(r"[\s/\\:*?\"<>|]+")
+
+
+def sanitize_filename_part(raw: str) -> str:
+    """One path segment safe for macOS / Windows / Linux file names."""
+    s = (raw or "").strip()
+    if not s:
+        return "Location_unknown"
+    s = _FILENAME_UNSAFE.sub("_", s)
+    s = s.strip("._")
+    return s or "Location_unknown"
+
+
+def build_inventory_download_filename(
+    location: str,
+    export_date: date,
+    *,
+    daily_log: bool,
+) -> str:
+    """Build download name: ``{Location}_{YYYY-MM-DD}_{Inventory_Log}.xlsx``."""
+    loc = sanitize_filename_part(location)
+    tail = "Daily_Inventory_Log" if daily_log else "Inventory_Log"
+    return f"{loc}_{export_date:%Y-%m-%d}_{tail}.xlsx"
+
+
 def find_inventory_csv() -> Path:
     """Locate the Shopify inventory export to use.
 
@@ -1149,7 +1174,12 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
 
 def main() -> None:
     csv_path = find_inventory_csv()
-    build_workbook(csv_path, OUTPUT_PATH)
+    out = OUTPUT_PATH
+    if len(sys.argv) > 2:
+        out = Path(sys.argv[2]).expanduser().resolve()
+        if out.suffix.lower() != ".xlsx":
+            out = out.with_suffix(".xlsx")
+    build_workbook(csv_path, out)
 
 
 if __name__ == "__main__":

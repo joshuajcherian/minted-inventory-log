@@ -14,16 +14,16 @@ Deploy publicly (free):
 
 from __future__ import annotations
 
-import io
 import tempfile
 import traceback
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import streamlit as st
 
 from build_inventory_log import (
     InvalidShopifyCsv,
+    build_inventory_download_filename,
     build_workbook,
     validate_shopify_csv,
 )
@@ -233,6 +233,44 @@ uploaded = st.file_uploader(
     label_visibility="collapsed",
 )
 
+# Defaults for download file naming (used once a file is uploaded or after a build).
+if "inv_export_location" not in st.session_state:
+    st.session_state["inv_export_location"] = ""
+if "inv_export_date" not in st.session_state:
+    st.session_state["inv_export_date"] = date.today()
+if "inv_export_label" not in st.session_state:
+    st.session_state["inv_export_label"] = "Daily Inventory Log"
+
+show_naming = uploaded is not None or "xlsx_bytes" in st.session_state
+
+if show_naming:
+    st.markdown(
+        f"""
+        <div class="step-card" style="border-left: 3px solid {DEEP_GREEN};">
+          <h3>Name your download</h3>
+          <p>These appear in the <b>.xlsx</b> file name: location, date, then your chosen label.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.text_input(
+        "Store / location name",
+        placeholder="e.g. Dacula · Lawrenceville",
+        key="inv_export_location",
+        help="Required before building. Unsafe characters become underscores in the file name.",
+    )
+    st.date_input(
+        "Date on the file",
+        key="inv_export_date",
+        help="Usually today, or the day of this count / export.",
+    )
+    st.radio(
+        "Ending label",
+        ["Daily Inventory Log", "Inventory Log"],
+        horizontal=True,
+        key="inv_export_label",
+        help='File ends in “…_Daily_Inventory_Log.xlsx” or “…_Inventory_Log.xlsx”.',
+    )
 
 # --- Step 3: Build --------------------------------------------------------
 
@@ -256,33 +294,36 @@ if uploaded is not None:
     )
 
     if st.button("Build Inventory Log", type="primary", use_container_width=True):
-        with st.spinner("Crunching SKUs and assembling the workbook…"):
-            try:
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    tmp_csv = Path(tmpdir) / "input.csv"
-                    tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
+        if not st.session_state.get("inv_export_location", "").strip():
+            st.warning("Enter a **store / location name** first — it’s part of the downloaded file name.")
+        else:
+            with st.spinner("Crunching SKUs and assembling the workbook…"):
+                try:
+                    with tempfile.TemporaryDirectory() as tmpdir:
+                        tmp_csv = Path(tmpdir) / "input.csv"
+                        tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
 
-                    tmp_csv.write_bytes(uploaded.getvalue())
+                        tmp_csv.write_bytes(uploaded.getvalue())
 
-                    # Validate up front so we can show a clear, friendly error
-                    # instead of an openpyxl traceback.
-                    validate_shopify_csv(tmp_csv)
+                        # Validate up front so we can show a clear, friendly error
+                        # instead of an openpyxl traceback.
+                        validate_shopify_csv(tmp_csv)
 
-                    summary = build_workbook(tmp_csv, tmp_xlsx)
-                    xlsx_bytes = tmp_xlsx.read_bytes()
+                        summary = build_workbook(tmp_csv, tmp_xlsx)
+                        xlsx_bytes = tmp_xlsx.read_bytes()
 
-                st.session_state["xlsx_bytes"] = xlsx_bytes
-                st.session_state["summary"] = summary
-                st.session_state["built_at"] = datetime.now()
-            except InvalidShopifyCsv as e:
-                st.session_state.pop("xlsx_bytes", None)
-                st.error("⚠️  Wrong file type")
-                st.markdown(str(e).replace("\n", "  \n"))
-            except Exception as e:  # noqa: BLE001 — surface anything else to the user
-                st.session_state.pop("xlsx_bytes", None)
-                st.error(f"Build failed: {e}")
-                with st.expander("Technical details"):
-                    st.code(traceback.format_exc(), language="text")
+                    st.session_state["xlsx_bytes"] = xlsx_bytes
+                    st.session_state["summary"] = summary
+                    st.session_state["built_at"] = datetime.now()
+                except InvalidShopifyCsv as e:
+                    st.session_state.pop("xlsx_bytes", None)
+                    st.error("⚠️  Wrong file type")
+                    st.markdown(str(e).replace("\n", "  \n"))
+                except Exception as e:  # noqa: BLE001 — surface anything else to the user
+                    st.session_state.pop("xlsx_bytes", None)
+                    st.error(f"Build failed: {e}")
+                    with st.expander("Technical details"):
+                        st.code(traceback.format_exc(), language="text")
 
 
 # --- Step 4: Download -----------------------------------------------------
@@ -309,9 +350,19 @@ if "xlsx_bytes" in st.session_state:
         unsafe_allow_html=True,
     )
 
-    filename = f"Minted_Inventory_Log_{built_at:%Y-%m-%d}.xlsx"
+    loc_raw = st.session_state.get("inv_export_location", "").strip() or "Location_unknown"
+    exp_date = st.session_state.get("inv_export_date", date.today())
+    if isinstance(exp_date, datetime):
+        exp_date = exp_date.date()
+    if not isinstance(exp_date, date):
+        exp_date = date.today()
+    daily = (
+        st.session_state.get("inv_export_label", "Inventory Log") == "Daily Inventory Log"
+    )
+    filename = build_inventory_download_filename(loc_raw, exp_date, daily_log=daily)
+    st.caption(f"Download file: `{filename}`")
     st.download_button(
-        label="⬇  Download Minted Inventory Log",
+        label="⬇  Download workbook",
         data=st.session_state["xlsx_bytes"],
         file_name=filename,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
