@@ -40,28 +40,63 @@ def _logo_data_uri(filename: str) -> str | None:
     return f"data:image/png;base64,{b64}"
 
 
-def _is_dev_environment() -> bool:
-    """True on the *-dev.streamlit.app subdomain or when running locally,
-    so the DEV badge auto-hides on prod URLs without any branch-specific
-    code to maintain."""
+def _deployed_branch() -> str:
+    """Read the git branch from the checkout's .git/HEAD. Streamlit Cloud
+    clones the repo at deploy time and leaves .git/ in place, so this is a
+    reliable signal of whether we're on main, dev, or anything else."""
     try:
-        host = st.context.headers.get("Host", "") or ""
+        head = APP_ROOT / ".git" / "HEAD"
+        if head.exists():
+            content = head.read_text().strip()
+            if content.startswith("ref: refs/heads/"):
+                return content[len("ref: refs/heads/"):]
+            return content[:8]  # detached HEAD — show short SHA
+    except Exception:
+        pass
+    return ""
+
+
+def _is_dev_environment() -> tuple[bool, str]:
+    """Returns (is_dev, label). Layered signals so this works whether or
+    not Streamlit Cloud exposes the Host header reliably."""
+    # 1. Explicit override via Streamlit secrets (user can set ENVIRONMENT="dev").
+    try:
+        env = str(st.secrets.get("environment", "")).strip().lower()
+        if env in ("dev", "development", "staging"):
+            return True, f"DEV · {env}"
+        if env in ("prod", "production"):
+            return False, ""
+    except Exception:
+        pass
+
+    # 2. Git branch from the deployed checkout.
+    branch = _deployed_branch()
+    if branch and branch.lower() not in ("main", "master", "prod", "production"):
+        return True, f"DEV · {branch}"
+
+    # 3. Local dev / unknown host fallback.
+    try:
+        host = (st.context.headers.get("Host", "") or "").lower()
     except Exception:
         host = ""
-    host = host.lower()
-    return (
-        "-dev." in host
-        or host.startswith("localhost")
-        or host.startswith("127.")
-        or host.startswith("0.0.0.0")
-    )
+    if host.startswith(("localhost", "127.", "0.0.0.0")):
+        return True, "LOCAL"
+    if "-dev." in host or "dev-" in host or ".dev." in host:
+        return True, "DEV"
+
+    return False, ""
 
 
 # --- Page setup -----------------------------------------------------------
 
+# Detect environment BEFORE set_page_config so the browser tab title and
+# favicon can reflect dev vs prod. The result is reused for the banner.
+_is_dev, _dev_label = _is_dev_environment()
+
 st.set_page_config(
-    page_title="Minted TCG — Inventory Log",
-    page_icon="🎴",
+    page_title=("Minted TCG — Inventory Log · DEV" if _is_dev
+                else "Minted TCG — Inventory Log"),
+    page_icon=("🚧" if _is_dev else "🎴"),
     layout="centered",
     initial_sidebar_state="collapsed",
 )
@@ -315,22 +350,52 @@ st.markdown(
       }}
       .footer .dot {{ color: {GOLD}; padding: 0 6px; }}
 
-      /* DEV-only badge — auto-hides on the prod URL via _is_dev_environment(). */
-      .dev-badge {{
+      /* DEV-only banner — full-width strip across the top of the page.
+         Auto-hides on prod via _is_dev_environment(). The Streamlit toolbar
+         sits above us (40 px tall), so we offset the banner downward to
+         clear it, and pad the page so the banner doesn't cover the hero. */
+      .dev-banner {{
         position: fixed;
-        top: 12px;
-        right: 14px;
-        z-index: 9999;
-        background: {GOLD};
+        top: 40px;
+        left: 0;
+        right: 0;
+        z-index: 9998;
+        background: repeating-linear-gradient(
+          135deg,
+          {GOLD} 0,
+          {GOLD} 18px,
+          #F0B800 18px,
+          #F0B800 36px
+        );
         color: {DEEP_GREEN};
+        text-align: center;
         font-family: {DISPLAY_STACK};
         font-weight: 900;
-        font-size: 0.72rem;
-        letter-spacing: 0.18em;
-        padding: 6px 12px;
-        border-radius: 999px;
-        box-shadow: 0 6px 18px -6px rgba(12, 31, 24, 0.45);
-        border: 1px solid rgba(12, 31, 24, 0.18);
+        font-size: 0.85rem;
+        letter-spacing: 0.22em;
+        padding: 10px 16px;
+        text-transform: uppercase;
+        box-shadow: 0 4px 14px -4px rgba(12, 31, 24, 0.35);
+        border-bottom: 2px solid {DEEP_GREEN};
+      }}
+      .dev-banner .pulse {{
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        margin-right: 10px;
+        border-radius: 50%;
+        background: {DEEP_GREEN};
+        vertical-align: middle;
+        animation: dev-pulse 1.6s ease-in-out infinite;
+      }}
+      @keyframes dev-pulse {{
+        0%, 100% {{ opacity: 1; transform: scale(1); }}
+        50%      {{ opacity: 0.35; transform: scale(0.7); }}
+      }}
+      /* Push the page content down so the fixed banner doesn't overlap. */
+      body.has-dev-banner .stApp,
+      .has-dev-banner .block-container {{
+        padding-top: 56px !important;
       }}
     </style>
     """,
@@ -338,10 +403,22 @@ st.markdown(
 )
 
 
-# --- DEV badge (auto-hidden on prod) --------------------------------------
+# --- DEV banner (auto-hidden on prod) -------------------------------------
 
-if _is_dev_environment():
-    st.markdown('<div class="dev-badge">DEV</div>', unsafe_allow_html=True)
+if _is_dev:
+    st.markdown(
+        f"""
+        <script>
+          document.body && document.body.classList.add('has-dev-banner');
+          const root = window.parent && window.parent.document && window.parent.document.body;
+          if (root) {{ root.classList.add('has-dev-banner'); }}
+        </script>
+        <div class="dev-banner">
+          <span class="pulse"></span>{_dev_label} · NOT FOR PRODUCTION · CHANGES HERE WON'T AFFECT THE LIVE TEAM URL
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 # --- Hero -----------------------------------------------------------------
