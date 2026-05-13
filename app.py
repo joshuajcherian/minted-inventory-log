@@ -32,9 +32,8 @@ from build_inventory_log import (
 APP_ROOT = Path(__file__).resolve().parent
 
 
-def _header_logo_data_uri() -> str | None:
-    """Green horizontal logo on transparent PNG — reads on a light mint hero."""
-    path = APP_ROOT / "assets" / "branding" / "logo_horizontal_green.png"
+def _logo_data_uri(filename: str) -> str | None:
+    path = APP_ROOT / "assets" / "branding" / filename
     if not path.exists():
         return None
     b64 = base64.b64encode(path.read_bytes()).decode("ascii")
@@ -50,81 +49,118 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# --- Brand styling (primary green #1B733D · deep #0E1B14 · gold #E8C547) ---
+# --- Brand tokens (Minted TCG · Play the Game palette) --------------------
+# Sampled from the official brand kit PNGs.
 
-BRAND_PRIMARY = "#1B733D"
-DEEP_GREEN = "#0E1B14"
-ACCENT_GOLD = "#E8C547"
-MINT_SOFT = "#EEF4F0"
-SAGE_BORDER = "#B8C9C0"
-# Light hero wash (lighter brand green backdrop)
-HERO_LIGHT_TOP = "#F0F7F3"
-HERO_LIGHT_BOTTOM = "#D9EBE2"
+BRAND_GREEN  = "#157649"  # primary / logo green
+DEEP_GREEN   = "#0C1F18"  # near-black forest — hero & section heads
+GOLD         = "#FFCC08"  # accent — "PLAY" highlight
+GOLD_SOFT    = "#FFE174"  # hover / glow
+MINT_WASH    = "#F2F8F4"  # off-white wash for stripes
+SAGE_BORDER  = "#C9DBD0"
+INK          = "#0C1F18"
+MUTED        = "#5A6B63"
 
 st.markdown(
     f"""
     <style>
+      /* --- Page base ------------------------------------------------- */
       .stApp {{
         background:
-          radial-gradient(ellipse at 50% 0%, rgba(27, 115, 61, 0.12) 0%, transparent 52%),
+          radial-gradient(ellipse at 0% -10%, rgba(21, 118, 73, 0.10) 0%, transparent 55%),
+          radial-gradient(ellipse at 100% 110%, rgba(255, 204, 8, 0.08) 0%, transparent 55%),
           #FFFFFF;
       }}
-
       .block-container {{
-        max-width: 760px;
-        padding-top: 2.5rem;
+        max-width: 780px;
+        padding-top: 2.25rem;
         padding-bottom: 4rem;
       }}
 
-      .minted-header {{
-        background: linear-gradient(165deg, {HERO_LIGHT_TOP} 0%, {HERO_LIGHT_BOTTOM} 100%);
-        color: {DEEP_GREEN};
-        padding: 26px 28px 28px;
-        border-radius: 14px;
+      /* --- Hero ------------------------------------------------------ */
+      .minted-hero {{
+        position: relative;
+        background:
+          radial-gradient(circle at 85% 20%, rgba(255, 204, 8, 0.18) 0%, transparent 45%),
+          linear-gradient(150deg, {DEEP_GREEN} 0%, #143324 60%, {BRAND_GREEN} 130%);
+        color: #FFFFFF;
+        padding: 34px 36px 30px;
+        border-radius: 18px;
         margin-bottom: 28px;
-        border: 1px solid rgba(27, 115, 61, 0.18);
-        border-bottom: 4px solid {ACCENT_GOLD};
-        box-shadow: 0 12px 36px -18px rgba(27, 115, 61, 0.22);
+        box-shadow: 0 22px 50px -22px rgba(12, 31, 24, 0.55);
+        overflow: hidden;
       }}
-      .minted-header-logo {{
+      .minted-hero::after {{
+        content: "";
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        height: 6px;
+        background: {GOLD};
+      }}
+      .minted-hero-logo {{
         display: block;
-        max-height: 52px;
+        max-height: 64px;
         width: auto;
-        margin-bottom: 16px;
+        margin-bottom: 18px;
         background: transparent !important;
         box-shadow: none !important;
         border: none !important;
       }}
-      .minted-header h1 {{
+      .minted-hero h1 {{
         font-family: 'Inter', system-ui, sans-serif;
-        font-size: 1.45rem;
+        font-size: 1.55rem;
         font-weight: 800;
-        margin: 0 0 8px;
+        margin: 0 0 6px;
         letter-spacing: -0.02em;
-        color: {DEEP_GREEN};
+        color: #FFFFFF;
       }}
-      .minted-header p {{
+      .minted-hero .eyebrow {{
         font-family: 'DM Sans', system-ui, sans-serif;
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin: 0;
-        color: {BRAND_PRIMARY};
-        letter-spacing: 0.05em;
+        font-size: 0.78rem;
+        font-weight: 700;
+        margin: 0 0 14px;
+        color: {GOLD};
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }}
+      .minted-hero p.lede {{
+        font-family: 'DM Sans', system-ui, sans-serif;
+        font-size: 0.96rem;
+        font-weight: 500;
+        margin: 0;
+        max-width: 56ch;
+        color: rgba(255, 255, 255, 0.86);
+        line-height: 1.55;
+      }}
 
+      /* --- Section cards -------------------------------------------- */
       .step-card {{
-        background: white;
+        position: relative;
+        background: #FFFFFF;
         border: 1px solid {SAGE_BORDER};
+        border-left: 4px solid {BRAND_GREEN};
         border-radius: 12px;
-        padding: 22px 24px;
+        padding: 22px 24px 22px 26px;
         margin-bottom: 18px;
-        box-shadow: 0 2px 10px rgba(14, 27, 20, 0.06);
+        box-shadow: 0 2px 10px rgba(12, 31, 24, 0.06);
+      }}
+      .step-card .step-num {{
+        display: inline-block;
+        background: {BRAND_GREEN};
+        color: {GOLD};
+        font-family: 'Inter', system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        padding: 4px 10px;
+        border-radius: 999px;
+        text-transform: uppercase;
+        margin-bottom: 10px;
       }}
       .step-card h3 {{
         font-family: 'Inter', system-ui, sans-serif;
         color: {DEEP_GREEN};
-        font-size: 1.05rem;
+        font-size: 1.08rem;
         font-weight: 700;
         margin: 0 0 8px;
         letter-spacing: -0.01em;
@@ -132,39 +168,51 @@ st.markdown(
       .step-card p, .step-card li {{
         font-family: 'DM Sans', system-ui, sans-serif;
         color: #1A1A1A;
-        font-size: 0.92rem;
+        font-size: 0.94rem;
         margin: 0;
       }}
+      .step-card.naming  {{ border-left-color: {DEEP_GREEN}; }}
+      .step-card.build   {{ border-left-color: {BRAND_GREEN}; }}
+      .step-card.success {{ border-left-color: {GOLD}; }}
 
+      /* --- File uploader -------------------------------------------- */
       div[data-testid="stFileUploader"] section {{
-        background: {MINT_SOFT};
-        border: 2px dashed {BRAND_PRIMARY};
+        background: {MINT_WASH};
+        border: 2px dashed {BRAND_GREEN};
         border-radius: 12px;
-        padding: 20px;
+        padding: 22px;
       }}
 
+      /* --- Primary buttons / download ------------------------------- */
       div.stButton > button[kind="primary"],
       div.stDownloadButton > button {{
-        background: {BRAND_PRIMARY};
+        background: {BRAND_GREEN};
         color: #FFFFFF;
         border: 0;
         border-radius: 10px;
-        padding: 12px 22px;
+        padding: 14px 24px;
         font-family: 'Inter', system-ui, sans-serif;
-        font-weight: 700;
-        font-size: 1rem;
+        font-weight: 800;
+        font-size: 1.02rem;
         letter-spacing: 0.02em;
-        box-shadow: 0 12px 28px -10px rgba(27, 115, 61, 0.45);
-        transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+        box-shadow: 0 14px 32px -12px rgba(21, 118, 73, 0.55);
+        transition: transform 120ms ease, box-shadow 120ms ease,
+                    background 120ms ease, color 120ms ease;
       }}
       div.stButton > button[kind="primary"]:hover,
       div.stDownloadButton > button:hover {{
         transform: translateY(-1px);
-        background: #155a31;
-        color: {ACCENT_GOLD};
-        box-shadow: 0 18px 40px -12px rgba(14, 27, 20, 0.35);
+        background: {DEEP_GREEN};
+        color: {GOLD};
+        box-shadow: 0 18px 44px -14px rgba(12, 31, 24, 0.5);
+      }}
+      div.stButton > button[kind="primary"]:focus,
+      div.stDownloadButton > button:focus {{
+        outline: 3px solid {GOLD_SOFT};
+        outline-offset: 2px;
       }}
 
+      /* --- Stat tiles ------------------------------------------------ */
       .stat-grid {{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -173,18 +221,28 @@ st.markdown(
       }}
       .stat-tile {{
         background: {DEEP_GREEN};
-        color: #fff;
+        color: #FFFFFF;
         border-radius: 12px;
-        padding: 14px 16px;
+        padding: 16px 14px;
         text-align: center;
+        position: relative;
+        overflow: hidden;
+      }}
+      .stat-tile::after {{
+        content: "";
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        height: 3px;
+        background: {GOLD};
+        opacity: 0.85;
       }}
       .stat-tile .label {{
         font-family: 'DM Sans', system-ui, sans-serif;
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         font-weight: 700;
-        letter-spacing: 0.12em;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
-        color: {ACCENT_GOLD};
+        color: {GOLD};
         margin-bottom: 6px;
       }}
       .stat-tile .value {{
@@ -194,42 +252,50 @@ st.markdown(
         line-height: 1;
       }}
       .stat-tile.alt {{
-        background: {BRAND_PRIMARY};
+        background: {BRAND_GREEN};
         color: #FFFFFF;
       }}
-      .stat-tile.alt .label {{ color: {ACCENT_GOLD}; }}
+      .stat-tile.alt .label {{ color: {GOLD}; }}
 
+      /* --- Progress bar --------------------------------------------- */
       div[data-testid="stProgressBar"] > div {{
-        background-color: {BRAND_PRIMARY} !important;
+        background-color: {BRAND_GREEN} !important;
       }}
 
+      /* --- Footer ---------------------------------------------------- */
       .footer {{
         margin-top: 36px;
         text-align: center;
         font-family: 'DM Sans', system-ui, sans-serif;
         font-size: 0.78rem;
-        color: #5A6B63;
+        color: {MUTED};
       }}
+      .footer .dot {{ color: {GOLD}; padding: 0 6px; }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-# --- Header ---------------------------------------------------------------
+# --- Hero -----------------------------------------------------------------
 
-_logo_uri = _header_logo_data_uri()
-_logo_html = (
-    f'<img src="{_logo_uri}" class="minted-header-logo" alt="Minted TCG" />'
-    if _logo_uri
+_hero_logo = _logo_data_uri("logo_horizontal_white_yellow.png")
+_hero_logo_html = (
+    f'<img src="{_hero_logo}" class="minted-hero-logo" alt="Minted TCG — Play the Game" />'
+    if _hero_logo
     else ""
 )
 st.markdown(
     f"""
-    <div class="minted-header">
-      {_logo_html}
+    <div class="minted-hero">
+      {_hero_logo_html}
+      <p class="eyebrow">Internal Tool</p>
       <h1>Inventory Log Generator</h1>
-      <p>Shopify inventory export → Minted count workbook</p>
+      <p class="lede">
+        Drop in a Shopify inventory export and get back a branded
+        <b style="color:{GOLD};">Daily Inventory Log</b> workbook —
+        ready for counts, audits, and discrepancy tracking.
+      </p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -241,13 +307,14 @@ st.markdown(
 st.markdown(
     """
     <div class="step-card">
-      <h3>1. Export inventory from Shopify</h3>
+      <span class="step-num">Step 1</span>
+      <h3>Export inventory from Shopify</h3>
       <p style="margin-bottom:14px; color:#1A1A1A; font-size:0.95rem;">
         Follow these steps so the CSV matches what this tool expects.
       </p>
       <ol style="margin:0 0 0 1.1rem; padding:0; color:#1A1A1A; font-size:0.92rem; line-height:1.65;">
         <li style="margin-bottom:10px;">Open <b>Shopify Admin</b> → <b>Products</b> → <b>Inventory</b>.</li>
-        <li style="margin-bottom:10px;">At the <b>top left</b>, next to <b>Inventory</b>, open the <b>location</b> dropdown and select the store you’re exporting for.</li>
+        <li style="margin-bottom:10px;">At the <b>top left</b>, next to <b>Inventory</b>, open the <b>location</b> dropdown and select the store you're exporting for.</li>
         <li style="margin-bottom:10px;">Click <b>Export</b>.</li>
         <li style="margin-bottom:10px;">In the export options, choose the scope Shopify shows you — e.g. <b>All states</b> or <b>Export inventory from your location</b> — so it lines up with that location.</li>
         <li style="margin-bottom:10px;">For <b>Inventory state shown</b>, set it to <b>All states</b>.</li>
@@ -266,8 +333,9 @@ st.markdown(
 st.markdown(
     """
     <div class="step-card">
-      <h3>2. Upload the CSV below</h3>
-      <p>You can drag the CSV from your desktop or Downloads — it’s usually the file Shopify emailed you.</p>
+      <span class="step-num">Step 2</span>
+      <h3>Upload the CSV</h3>
+      <p>Drag the CSV from your desktop or Downloads — usually the file Shopify emailed you.</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -289,10 +357,11 @@ show_naming = uploaded is not None or "xlsx_bytes" in st.session_state
 
 if show_naming:
     st.markdown(
-        f"""
-        <div class="step-card" style="border-left: 3px solid {DEEP_GREEN};">
+        """
+        <div class="step-card naming">
+          <span class="step-num">Name it</span>
           <h3>Name your download</h3>
-          <p>We’ll save the workbook as <b>Location</b> + <b>date</b> +
+          <p>We'll save the workbook as <b>Location</b> + <b>date</b> +
              <code style="font-size:0.85em;">_Daily_Inventory_Log.xlsx</code> — e.g.
              <code style="font-size:0.85em;">Dacula_2026-05-13_Daily_Inventory_Log.xlsx</code>.</p>
         </div>
@@ -325,8 +394,9 @@ def _human_size(num_bytes: int) -> str:
 if uploaded is not None:
     st.markdown(
         f"""
-        <div class="step-card" style="border-left: 4px solid {BRAND_PRIMARY};">
-          <h3>3. Build the inventory log</h3>
+        <div class="step-card build">
+          <span class="step-num">Step 3</span>
+          <h3>Build the inventory log</h3>
           <p><b>{uploaded.name}</b> · {_human_size(uploaded.size)}</p>
         </div>
         """,
@@ -335,7 +405,7 @@ if uploaded is not None:
 
     if st.button("Build Inventory Log", type="primary", use_container_width=True):
         if not st.session_state.get("inv_export_location", "").strip():
-            st.warning("Enter a **store / location name** first — it’s part of the downloaded file name.")
+            st.warning("Enter a **store / location name** first — it's part of the downloaded file name.")
         else:
             progress_bar = st.progress(0)
             status_el = st.empty()
@@ -384,8 +454,9 @@ if "xlsx_bytes" in st.session_state:
 
     st.markdown(
         f"""
-        <div class="step-card" style="border-left: 4px solid {ACCENT_GOLD};">
-          <h3>4. Download &amp; share</h3>
+        <div class="step-card success">
+          <span class="step-num" style="background:{GOLD}; color:{DEEP_GREEN};">Step 4</span>
+          <h3>Download &amp; share</h3>
           <p>Built {built_at:%b %d, %Y · %I:%M %p}</p>
           <div class="stat-grid">
             <div class="stat-tile"><div class="label">Total SKUs</div><div class="value">{total:,}</div></div>
@@ -419,7 +490,7 @@ if "xlsx_bytes" in st.session_state:
 st.markdown(
     f"""
     <div class="footer">
-      Minted TCG · Internal tool · Built on {datetime.now():%B %Y}
+      Minted TCG <span class="dot">●</span> Play the Game <span class="dot">●</span> Built {datetime.now():%B %Y}
     </div>
     """,
     unsafe_allow_html=True,

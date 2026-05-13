@@ -8,8 +8,8 @@ Sheets:
   3. Full Catalog    - Every SKU from the export (for searching anything)
   4. Discrepancy Log - Quick-reference table that auto-flags counted mismatches
 
-Brand palette (Minted TCG):
-  Primary green #1B733D · Deep green #0E1B14 · Gold accent #E8C547 · White
+Brand palette (Minted TCG — Play the Game):
+  Primary green #157649 · Deep green #0C1F18 · Gold accent #FFCC08 · White
 """
 
 from __future__ import annotations
@@ -223,23 +223,23 @@ def find_inventory_csv() -> Path:
     )
 
 
-# --- Brand tokens (Minted TCG · 2026 palette) -------------------------------
-# Medium forest green, deep green, gold accent, white — aligned with brand kit.
+# --- Brand tokens (Minted TCG · Play the Game palette) ---------------------
+# Sampled from the official brand kit PNGs: green #157649, gold #FFCC08.
 
-BRAND_PRIMARY = "FF1B733D"   # primary green (logo / CTAs)
+BRAND_PRIMARY = "FF157649"   # primary green (logo / CTAs)
 MINT = "FFC8DDD0"            # light sage for secondary tiles & tints
-MINT_SOFT = "FFEEF4F0"      # very light wash for hints & stripes
-DEEP_GREEN = "FF0E1B14"     # near-black forest for headers & banners
-NEON = "FFE8C547"           # gold / "PLAY" accent (bars, highlights)
+MINT_SOFT = "FFF2F8F4"       # very light wash for hints & stripes
+DEEP_GREEN = "FF0C1F18"      # near-black forest for headers & banners
+NEON = "FFFFCC08"            # gold / "PLAY" accent (bars, highlights)
 WHITE = "FFFFFFFF"
-INK = "FF1A1A1A"
-SOFT_BORDER = "FFC5D4CC"
+INK = "FF0C1F18"
+SOFT_BORDER = "FFC9DBD0"
 DANGER_BG = "FFFDE7E9"
 DANGER_FG = "FFB42318"
 WARN_BG = "FFFFF4D6"
 WARN_FG = "FF8A6100"
 SUCCESS_BG = "FFE6F8EF"
-SUCCESS_FG = "FF1B733D"
+SUCCESS_FG = "FF157649"
 NEUTRAL_BG = "FFF1F4F2"
 
 DISPLAY_FONT = "Inter"
