@@ -70,6 +70,10 @@ DISPLAY_STACK = (
 )
 BODY_STACK = "Effra, Mulish, 'Inter', system-ui, sans-serif"
 
+# Pre-compute the hero logo data URI so it can be baked into the hero's CSS
+# background stack (one element, no nested img/div).
+_HERO_LOGO_URI = _logo_data_uri("logo_horizontal_white_yellow.png") or ""
+
 st.markdown(
     f"""
     <style>
@@ -90,13 +94,21 @@ st.markdown(
       }}
 
       /* --- Hero ------------------------------------------------------ */
+      /* The logo is layered as a CSS background on the hero itself — NOT
+         an img, NOT a child div. One element, one composited background.
+         Nothing for Streamlit's theme to paint between. */
       .minted-hero {{
         position: relative;
-        background:
+        background-color: {BRAND_GREEN};
+        background-image:
+          url("{_HERO_LOGO_URI}"),
           radial-gradient(circle at 88% 22%, rgba(255, 204, 8, 0.18) 0%, transparent 48%),
           linear-gradient(160deg, #0F5C39 0%, {BRAND_GREEN} 55%, #1A8554 100%);
+        background-repeat: no-repeat, no-repeat, no-repeat;
+        background-position: 36px 30px, top right, top left;
+        background-size: 240px auto, 100% 100%, 100% 100%;
         color: #FFFFFF;
-        padding: 34px 36px 30px;
+        padding: 132px 36px 30px;
         border-radius: 18px;
         margin-bottom: 28px;
         box-shadow: 0 22px 50px -22px rgba(12, 31, 24, 0.55);
@@ -108,18 +120,6 @@ st.markdown(
         left: 0; right: 0; bottom: 0;
         height: 6px;
         background: {GOLD};
-      }}
-
-      /* Logo: rendered as a CSS background-image on a div (NOT an <img>
-         tag) so Streamlit's theme cannot inject a fill behind it. */
-      .minted-hero-logo {{
-        display: block;
-        width: 240px;
-        height: 78px;
-        margin-bottom: 18px;
-        background-repeat: no-repeat;
-        background-position: left center;
-        background-size: contain;
       }}
       .minted-hero h1 {{
         font-family: {DISPLAY_STACK};
@@ -302,18 +302,9 @@ st.markdown(
 
 # --- Hero -----------------------------------------------------------------
 
-_hero_logo = _logo_data_uri("logo_horizontal_white_yellow.png")
-_hero_logo_html = (
-    f'<div class="minted-hero-logo" role="img" '
-    f'aria-label="Minted TCG — Play the Game" '
-    f'style="background-image: url(\'{_hero_logo}\');"></div>'
-    if _hero_logo
-    else ""
-)
 st.markdown(
     f"""
-    <div class="minted-hero">
-      {_hero_logo_html}
+    <div class="minted-hero" role="banner" aria-label="Minted TCG — Play the Game">
       <p class="eyebrow">Internal Tool</p>
       <h1>Inventory Log Generator</h1>
       <p class="lede">
