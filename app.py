@@ -14,6 +14,7 @@ Deploy publicly (free):
 
 from __future__ import annotations
 
+import base64
 import tempfile
 import traceback
 from datetime import date, datetime
@@ -28,28 +29,41 @@ from build_inventory_log import (
 )
 
 
+APP_ROOT = Path(__file__).resolve().parent
+
+
+def _header_logo_data_uri() -> str | None:
+    """White + gold horizontal logo for the dark hero bar."""
+    path = APP_ROOT / "assets" / "branding" / "logo_horizontal_white_yellow.png"
+    if not path.exists():
+        return None
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
 # --- Page setup -----------------------------------------------------------
 
 st.set_page_config(
-    page_title="Minted — Inventory Log Generator",
-    page_icon="🌿",
+    page_title="Minted TCG — Inventory Log",
+    page_icon="🎴",
     layout="centered",
     initial_sidebar_state="collapsed",
 )
 
-# --- Brand styling --------------------------------------------------------
+# --- Brand styling (primary green #1B733D · deep #0E1B14 · gold #E8C547) ---
 
-MINT = "#6AB799"
-DEEP_GREEN = "#0D271D"
-NEON = "#44FFB7"
-MINT_SOFT = "#E6F2EC"
+BRAND_PRIMARY = "#1B733D"
+DEEP_GREEN = "#0E1B14"
+ACCENT_GOLD = "#E8C547"
+MINT_SOFT = "#EEF4F0"
+SAGE_BORDER = "#B8C9C0"
 
 st.markdown(
     f"""
     <style>
       .stApp {{
         background:
-          radial-gradient(ellipse at 50% 0%, rgba(106,183,153,0.18) 0%, transparent 55%),
+          radial-gradient(ellipse at 50% 0%, rgba(27, 115, 61, 0.12) 0%, transparent 52%),
           #FFFFFF;
       }}
 
@@ -60,39 +74,45 @@ st.markdown(
       }}
 
       .minted-header {{
-        background: {DEEP_GREEN};
+        background: linear-gradient(165deg, {DEEP_GREEN} 0%, #152922 100%);
         color: white;
-        padding: 28px 32px;
+        padding: 26px 28px 28px;
         border-radius: 14px;
         margin-bottom: 28px;
-        border-bottom: 4px solid {NEON};
-        box-shadow: 0 24px 50px -20px rgba(13,39,29,0.35);
+        border-bottom: 4px solid {ACCENT_GOLD};
+        box-shadow: 0 24px 48px -18px rgba(14, 27, 20, 0.45);
+      }}
+      .minted-header-logo {{
+        display: block;
+        max-height: 52px;
+        width: auto;
+        margin-bottom: 16px;
       }}
       .minted-header h1 {{
         font-family: 'Inter', system-ui, sans-serif;
-        font-size: 2.0rem;
+        font-size: 1.45rem;
         font-weight: 800;
-        margin: 0 0 6px;
-        letter-spacing: -0.01em;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
         color: #fff;
       }}
       .minted-header p {{
         font-family: 'DM Sans', system-ui, sans-serif;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         font-weight: 600;
         margin: 0;
-        color: {NEON};
-        letter-spacing: 0.06em;
+        color: {ACCENT_GOLD};
+        letter-spacing: 0.05em;
         text-transform: uppercase;
       }}
 
       .step-card {{
         background: white;
-        border: 1px solid #D8E5DE;
+        border: 1px solid {SAGE_BORDER};
         border-radius: 12px;
         padding: 22px 24px;
         margin-bottom: 18px;
-        box-shadow: 0 2px 10px rgba(13,39,29,0.04);
+        box-shadow: 0 2px 10px rgba(14, 27, 20, 0.06);
       }}
       .step-card h3 {{
         font-family: 'Inter', system-ui, sans-serif;
@@ -102,7 +122,7 @@ st.markdown(
         margin: 0 0 8px;
         letter-spacing: -0.01em;
       }}
-      .step-card p {{
+      .step-card p, .step-card li {{
         font-family: 'DM Sans', system-ui, sans-serif;
         color: #1A1A1A;
         font-size: 0.92rem;
@@ -111,16 +131,15 @@ st.markdown(
 
       div[data-testid="stFileUploader"] section {{
         background: {MINT_SOFT};
-        border: 2px dashed {MINT};
+        border: 2px dashed {BRAND_PRIMARY};
         border-radius: 12px;
         padding: 20px;
       }}
 
-      /* Primary button styling */
       div.stButton > button[kind="primary"],
       div.stDownloadButton > button {{
-        background: {DEEP_GREEN};
-        color: {NEON};
+        background: {BRAND_PRIMARY};
+        color: #FFFFFF;
         border: 0;
         border-radius: 10px;
         padding: 12px 22px;
@@ -128,15 +147,15 @@ st.markdown(
         font-weight: 700;
         font-size: 1rem;
         letter-spacing: 0.02em;
-        box-shadow: 0 12px 30px -10px rgba(13,39,29,0.35);
-        transition: transform 120ms ease, box-shadow 120ms ease;
+        box-shadow: 0 12px 28px -10px rgba(27, 115, 61, 0.45);
+        transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
       }}
       div.stButton > button[kind="primary"]:hover,
       div.stDownloadButton > button:hover {{
         transform: translateY(-1px);
-        background: {DEEP_GREEN};
-        color: #fff;
-        box-shadow: 0 18px 40px -12px rgba(13,39,29,0.45);
+        background: #155a31;
+        color: {ACCENT_GOLD};
+        box-shadow: 0 18px 40px -12px rgba(14, 27, 20, 0.35);
       }}
 
       .stat-grid {{
@@ -158,7 +177,7 @@ st.markdown(
         font-weight: 700;
         letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: {NEON};
+        color: {ACCENT_GOLD};
         margin-bottom: 6px;
       }}
       .stat-tile .value {{
@@ -168,17 +187,21 @@ st.markdown(
         line-height: 1;
       }}
       .stat-tile.alt {{
-        background: {MINT};
-        color: {DEEP_GREEN};
+        background: {BRAND_PRIMARY};
+        color: #FFFFFF;
       }}
-      .stat-tile.alt .label {{ color: {DEEP_GREEN}; }}
+      .stat-tile.alt .label {{ color: {ACCENT_GOLD}; }}
+
+      div[data-testid="stProgressBar"] > div {{
+        background-color: {BRAND_PRIMARY} !important;
+      }}
 
       .footer {{
         margin-top: 36px;
         text-align: center;
         font-family: 'DM Sans', system-ui, sans-serif;
         font-size: 0.78rem;
-        color: #6B7B73;
+        color: #5A6B63;
       }}
     </style>
     """,
@@ -188,11 +211,18 @@ st.markdown(
 
 # --- Header ---------------------------------------------------------------
 
+_logo_uri = _header_logo_data_uri()
+_logo_html = (
+    f'<img src="{_logo_uri}" class="minted-header-logo" alt="Minted TCG" />'
+    if _logo_uri
+    else ""
+)
 st.markdown(
-    """
+    f"""
     <div class="minted-header">
-      <h1>Minted — Inventory Log Generator</h1>
-      <p>Upload the inventory CSV from Shopify (email export) · Download your count workbook</p>
+      {_logo_html}
+      <h1>Inventory Log Generator</h1>
+      <p>Shopify inventory export → Minted count workbook</p>
     </div>
     """,
     unsafe_allow_html=True,
@@ -287,7 +317,7 @@ def _human_size(num_bytes: int) -> str:
 if uploaded is not None:
     st.markdown(
         f"""
-        <div class="step-card" style="border-left: 4px solid {MINT};">
+        <div class="step-card" style="border-left: 4px solid {BRAND_PRIMARY};">
           <h3>3. Build the inventory log</h3>
           <p><b>{uploaded.name}</b> · {_human_size(uploaded.size)}</p>
         </div>
@@ -346,7 +376,7 @@ if "xlsx_bytes" in st.session_state:
 
     st.markdown(
         f"""
-        <div class="step-card" style="border-left: 4px solid {NEON};">
+        <div class="step-card" style="border-left: 4px solid {ACCENT_GOLD};">
           <h3>4. Download &amp; share</h3>
           <p>Built {built_at:%b %d, %Y · %I:%M %p}</p>
           <div class="stat-grid">

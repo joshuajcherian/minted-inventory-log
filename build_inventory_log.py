@@ -8,11 +8,8 @@ Sheets:
   3. Full Catalog    - Every SKU from the export (for searching anything)
   4. Discrepancy Log - Quick-reference table that auto-flags counted mismatches
 
-Brand palette (matches design-system/generator/template.html):
-  Mint Green   #6AB799
-  Deep Green   #0D271D
-  Neon Glow    #44FFB7
-  White        #FFFFFF
+Brand palette (Minted TCG):
+  Primary green #1B733D · Deep green #0E1B14 · Gold accent #E8C547 · White
 """
 
 from __future__ import annotations
@@ -159,9 +156,9 @@ DOWNLOADS = Path.home() / "Downloads"
 
 
 def _find_logo() -> Path | None:
-    """Minted logo for workbook banners. Works in this repo layout and in the
-    slim `inventory-log-cloud/` deploy bundle (assets next to this file)."""
+    """Workbook banner: white horizontal logo on dark green rows."""
     for candidate in (
+        ROOT / "assets" / "branding" / "logo_excel_header.png",
         ROOT / "assets" / "minted-logo.png",
         ROOT / "design-system" / "assets" / "minted-logo.png",
     ):
@@ -226,21 +223,23 @@ def find_inventory_csv() -> Path:
     )
 
 
-# --- Brand tokens ----------------------------------------------------------
+# --- Brand tokens (Minted TCG · 2026 palette) -------------------------------
+# Medium forest green, deep green, gold accent, white — aligned with brand kit.
 
-MINT = "FF6AB799"
-MINT_SOFT = "FFE6F2EC"
-DEEP_GREEN = "FF0D271D"
-NEON = "FF44FFB7"
+BRAND_PRIMARY = "FF1B733D"   # primary green (logo / CTAs)
+MINT = "FFC8DDD0"            # light sage for secondary tiles & tints
+MINT_SOFT = "FFEEF4F0"      # very light wash for hints & stripes
+DEEP_GREEN = "FF0E1B14"     # near-black forest for headers & banners
+NEON = "FFE8C547"           # gold / "PLAY" accent (bars, highlights)
 WHITE = "FFFFFFFF"
 INK = "FF1A1A1A"
-SOFT_BORDER = "FFD8E5DE"
+SOFT_BORDER = "FFC5D4CC"
 DANGER_BG = "FFFDE7E9"
 DANGER_FG = "FFB42318"
 WARN_BG = "FFFFF4D6"
 WARN_FG = "FF8A6100"
 SUCCESS_BG = "FFE6F8EF"
-SUCCESS_FG = "FF12704F"
+SUCCESS_FG = "FF1B733D"
 NEUTRAL_BG = "FFF1F4F2"
 
 DISPLAY_FONT = "Inter"
@@ -1176,7 +1175,7 @@ def build_workbook(
         sheet_name="Singles Count",
         title="MINTED — SINGLES COUNT",
         subtitle="Individual cards · Count what's on the shelf · Mismatches flag automatically",
-        tab_color=MINT[2:],
+        tab_color="1B733D",
         table_name="SinglesCount",
         pad_rows=60,
     )
@@ -1188,7 +1187,7 @@ def build_workbook(
         sheet_name="Sealed Count",
         title="MINTED — SEALED & ACCESSORIES COUNT",
         subtitle="Booster boxes · ETBs · sleeves · accessories · count and flag",
-        tab_color="FF1F6A4F",
+        tab_color="0F5132",
         table_name="SealedCount",
         pad_rows=30,
     )
