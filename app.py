@@ -61,9 +61,21 @@ SAGE_BORDER  = "#C9DBD0"
 INK          = "#0C1F18"
 MUTED        = "#5A6B63"
 
+# Headers use Neue Haas Grotesk Display Pro 95 Black (brand). Body uses Effra
+# (brand). Both are licensed fonts, so we fall back through close free
+# substitutes (Archivo 900 / Mulish) for viewers who don't have them locally.
+DISPLAY_STACK = (
+    "'Neue Haas Grotesk Display Pro', 'Neue Haas Grotesque', "
+    "'NHaasGroteskDSPro-95Blk', 'Helvetica Neue', Archivo, Helvetica, sans-serif"
+)
+BODY_STACK = "Effra, Mulish, 'Inter', system-ui, sans-serif"
+
 st.markdown(
     f"""
     <style>
+      /* --- Webfont fallbacks (close free matches to brand fonts) ---- */
+      @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800;900&family=Mulish:wght@400;500;600;700;800&display=swap');
+
       /* --- Page base ------------------------------------------------- */
       .stApp {{
         background:
@@ -98,39 +110,28 @@ st.markdown(
         background: {GOLD};
       }}
 
-      /* Nuke Streamlit's default image chrome inside the hero so a
-         transparent PNG never picks up a dark fill from the theme. */
-      .minted-hero img,
-      .minted-hero picture,
-      .minted-hero figure,
-      .minted-hero [data-testid="stImage"],
-      .minted-hero [data-testid="stMarkdownContainer"] img {{
-        background: transparent !important;
-        background-color: transparent !important;
-        background-image: none !important;
-        box-shadow: none !important;
-        border: 0 !important;
-        outline: 0 !important;
-        padding: 0 !important;
-        filter: none !important;
-      }}
-
+      /* Logo: rendered as a CSS background-image on a div (NOT an <img>
+         tag) so Streamlit's theme cannot inject a fill behind it. */
       .minted-hero-logo {{
         display: block;
-        max-height: 64px;
-        width: auto;
+        width: 240px;
+        height: 78px;
         margin-bottom: 18px;
+        background-repeat: no-repeat;
+        background-position: left center;
+        background-size: contain;
       }}
       .minted-hero h1 {{
-        font-family: 'Inter', system-ui, sans-serif;
-        font-size: 1.55rem;
-        font-weight: 800;
+        font-family: {DISPLAY_STACK};
+        font-size: 1.65rem;
+        font-weight: 900;
         margin: 0 0 6px;
-        letter-spacing: -0.02em;
+        letter-spacing: -0.01em;
         color: #FFFFFF;
+        text-transform: none;
       }}
       .minted-hero .eyebrow {{
-        font-family: 'DM Sans', system-ui, sans-serif;
+        font-family: {BODY_STACK};
         font-size: 0.78rem;
         font-weight: 700;
         margin: 0 0 14px;
@@ -139,7 +140,7 @@ st.markdown(
         text-transform: uppercase;
       }}
       .minted-hero p.lede {{
-        font-family: 'DM Sans', system-ui, sans-serif;
+        font-family: {BODY_STACK};
         font-size: 0.96rem;
         font-weight: 500;
         margin: 0;
@@ -163,8 +164,8 @@ st.markdown(
         display: inline-block;
         background: {BRAND_GREEN};
         color: {GOLD};
-        font-family: 'Inter', system-ui, sans-serif;
-        font-weight: 800;
+        font-family: {DISPLAY_STACK};
+        font-weight: 900;
         font-size: 0.72rem;
         letter-spacing: 0.12em;
         padding: 4px 10px;
@@ -173,15 +174,15 @@ st.markdown(
         margin-bottom: 10px;
       }}
       .step-card h3 {{
-        font-family: 'Inter', system-ui, sans-serif;
+        font-family: {DISPLAY_STACK};
         color: {DEEP_GREEN};
-        font-size: 1.08rem;
-        font-weight: 700;
+        font-size: 1.12rem;
+        font-weight: 900;
         margin: 0 0 8px;
-        letter-spacing: -0.01em;
+        letter-spacing: -0.005em;
       }}
       .step-card p, .step-card li {{
-        font-family: 'DM Sans', system-ui, sans-serif;
+        font-family: {BODY_STACK};
         color: #1A1A1A;
         font-size: 0.94rem;
         margin: 0;
@@ -206,8 +207,8 @@ st.markdown(
         border: 0;
         border-radius: 10px;
         padding: 14px 24px;
-        font-family: 'Inter', system-ui, sans-serif;
-        font-weight: 800;
+        font-family: {DISPLAY_STACK};
+        font-weight: 900;
         font-size: 1.02rem;
         letter-spacing: 0.02em;
         box-shadow: 0 14px 32px -12px rgba(21, 118, 73, 0.55);
@@ -252,7 +253,7 @@ st.markdown(
         opacity: 0.85;
       }}
       .stat-tile .label {{
-        font-family: 'DM Sans', system-ui, sans-serif;
+        font-family: {BODY_STACK};
         font-size: 0.7rem;
         font-weight: 700;
         letter-spacing: 0.14em;
@@ -261,9 +262,9 @@ st.markdown(
         margin-bottom: 6px;
       }}
       .stat-tile .value {{
-        font-family: 'Inter', system-ui, sans-serif;
-        font-size: 1.7rem;
-        font-weight: 800;
+        font-family: {DISPLAY_STACK};
+        font-size: 1.85rem;
+        font-weight: 900;
         line-height: 1;
       }}
       .stat-tile.alt {{
@@ -278,10 +279,17 @@ st.markdown(
       }}
 
       /* --- Footer ---------------------------------------------------- */
+      /* Apply Effra / Mulish to all default Streamlit text & widgets too */
+      .stApp, .stApp p, .stApp label, .stApp span, .stApp div,
+      .stApp .stTextInput, .stApp .stDateInput, .stApp .stCaption,
+      div[data-testid="stFileUploader"] * {{
+        font-family: {BODY_STACK};
+      }}
+
       .footer {{
         margin-top: 36px;
         text-align: center;
-        font-family: 'DM Sans', system-ui, sans-serif;
+        font-family: {BODY_STACK};
         font-size: 0.78rem;
         color: {MUTED};
       }}
@@ -296,7 +304,9 @@ st.markdown(
 
 _hero_logo = _logo_data_uri("logo_horizontal_white_yellow.png")
 _hero_logo_html = (
-    f'<img src="{_hero_logo}" class="minted-hero-logo" alt="Minted TCG — Play the Game" />'
+    f'<div class="minted-hero-logo" role="img" '
+    f'aria-label="Minted TCG — Play the Game" '
+    f'style="background-image: url(\'{_hero_logo}\');"></div>'
     if _hero_logo
     else ""
 )

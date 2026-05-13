@@ -242,8 +242,10 @@ SUCCESS_BG = "FFE6F8EF"
 SUCCESS_FG = "FF157649"
 NEUTRAL_BG = "FFF1F4F2"
 
-DISPLAY_FONT = "Inter"
-BODY_FONT = "DM Sans"
+# Brand fonts: headers = Neue Haas Grotesk Display Pro 95 Black, body = Effra.
+# Excel will substitute its default if the user's machine doesn't have them.
+DISPLAY_FONT = "Neue Haas Grotesk Display Pro"
+BODY_FONT = "Effra"
 
 THIN = Side(style="thin", color=SOFT_BORDER)
 BORDER_ALL = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
