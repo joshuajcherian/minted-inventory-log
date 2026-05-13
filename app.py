@@ -25,7 +25,6 @@ from build_inventory_log import (
     InvalidShopifyCsv,
     build_inventory_download_filename,
     build_workbook,
-    validate_shopify_csv,
 )
 
 
@@ -300,33 +299,40 @@ if uploaded is not None:
         if not st.session_state.get("inv_export_location", "").strip():
             st.warning("Enter a **store / location name** first — it’s part of the downloaded file name.")
         else:
-            with st.spinner("Crunching SKUs and assembling the workbook…"):
-                try:
-                    with tempfile.TemporaryDirectory() as tmpdir:
-                        tmp_csv = Path(tmpdir) / "input.csv"
-                        tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
+            progress_bar = st.progress(0)
+            status_el = st.empty()
+            try:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    tmp_csv = Path(tmpdir) / "input.csv"
+                    tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
 
-                        tmp_csv.write_bytes(uploaded.getvalue())
+                    tmp_csv.write_bytes(uploaded.getvalue())
 
-                        # Validate up front so we can show a clear, friendly error
-                        # instead of an openpyxl traceback.
-                        validate_shopify_csv(tmp_csv)
+                    def report(frac: float, msg: str) -> None:
+                        progress_bar.progress(frac)
+                        status_el.caption(msg)
 
-                        summary = build_workbook(tmp_csv, tmp_xlsx)
-                        xlsx_bytes = tmp_xlsx.read_bytes()
+                    summary = build_workbook(tmp_csv, tmp_xlsx, progress=report)
+                    xlsx_bytes = tmp_xlsx.read_bytes()
 
-                    st.session_state["xlsx_bytes"] = xlsx_bytes
-                    st.session_state["summary"] = summary
-                    st.session_state["built_at"] = datetime.now()
-                except InvalidShopifyCsv as e:
-                    st.session_state.pop("xlsx_bytes", None)
-                    st.error("⚠️  Wrong file type")
-                    st.markdown(str(e).replace("\n", "  \n"))
-                except Exception as e:  # noqa: BLE001 — surface anything else to the user
-                    st.session_state.pop("xlsx_bytes", None)
-                    st.error(f"Build failed: {e}")
-                    with st.expander("Technical details"):
-                        st.code(traceback.format_exc(), language="text")
+                st.session_state["xlsx_bytes"] = xlsx_bytes
+                st.session_state["summary"] = summary
+                st.session_state["built_at"] = datetime.now()
+                progress_bar.progress(1.0)
+                status_el.caption("Done — scroll down to download your workbook.")
+            except InvalidShopifyCsv as e:
+                progress_bar.empty()
+                status_el.empty()
+                st.session_state.pop("xlsx_bytes", None)
+                st.error("⚠️  Wrong file type")
+                st.markdown(str(e).replace("\n", "  \n"))
+            except Exception as e:  # noqa: BLE001 — surface anything else to the user
+                progress_bar.empty()
+                status_el.empty()
+                st.session_state.pop("xlsx_bytes", None)
+                st.error(f"Build failed: {e}")
+                with st.expander("Technical details"):
+                    st.code(traceback.format_exc(), language="text")
 
 
 # --- Step 4: Download -----------------------------------------------------

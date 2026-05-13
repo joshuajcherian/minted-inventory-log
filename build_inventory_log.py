@@ -20,6 +20,7 @@ from __future__ import annotations
 import csv
 import re
 import sys
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 
@@ -1126,13 +1127,21 @@ def build_dashboard(
 
 # --- Main ------------------------------------------------------------------
 
-def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = None) -> dict:
+def build_workbook(
+    csv_path: Path,
+    output_path: Path,
+    logo_path: Path | None = None,
+    *,
+    progress: Callable[[float, str], None] | None = None,
+) -> dict:
     """Build the full Minted Inventory Log workbook from a Shopify CSV export.
 
     Args:
         csv_path:    Path to the Shopify inventory export CSV (any name).
         output_path: Where to save the resulting .xlsx workbook.
         logo_path:   Optional path to the Minted logo PNG; defaults to LOGO_PATH.
+        progress:    Optional callback ``(fraction, message)`` with fraction in
+                     ``[0, 1]`` for UIs (e.g. Streamlit progress bar).
 
     Returns:
         Dict with summary stats: {total, singles_stocked, sealed_stocked}.
@@ -1140,11 +1149,17 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
     Raises:
         InvalidShopifyCsv: if the CSV doesn't match the expected Shopify schema.
     """
+    def _p(frac: float, msg: str) -> None:
+        if progress is not None:
+            progress(max(0.0, min(1.0, frac)), msg)
+
     if logo_path is None:
         logo_path = LOGO_PATH
 
     print(f"Reading {csv_path} ...")
+    _p(0.04, "Validating CSV…")
     validate_shopify_csv(csv_path)
+    _p(0.10, "Reading rows from export (may take a bit)…")
     rows = load_rows(csv_path)
     total = len(rows)
 
@@ -1152,6 +1167,7 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
     stocked_sealed  = [r for r in rows if r["on_hand"] > 0 and r["category"] == "Sealed"]
     print(f"  {total:,} rows · {len(stocked_singles):,} singles stocked · {len(stocked_sealed):,} sealed stocked")
 
+    _p(0.22, f"Organized {total:,} SKUs · building Singles Count…")
     wb = Workbook()
     wb.remove(wb.active)
 
@@ -1166,6 +1182,7 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
     )
     print(f"  Built Singles Count ({singles_first}..{singles_last})")
 
+    _p(0.42, "Building Sealed & accessories count…")
     sealed_name, sealed_first, sealed_last = build_active_inventory(
         wb, stocked_sealed, logo_path,
         sheet_name="Sealed Count",
@@ -1177,6 +1194,7 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
     )
     print(f"  Built Sealed Count ({sealed_first}..{sealed_last})")
 
+    _p(0.55, "Building Discrepancy Log…")
     build_discrepancy_log(
         wb,
         sources=[
@@ -1187,9 +1205,11 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
     )
     print("  Built Discrepancy Log")
 
+    _p(0.62, "Building Full Catalog (largest step)…")
     build_full_catalog(wb, rows, logo_path)
     print("  Built Full Catalog")
 
+    _p(0.90, "Building Dashboard…")
     build_dashboard(
         wb,
         singles_sheet=singles_name, singles_first=singles_first, singles_last=singles_last,
@@ -1205,9 +1225,11 @@ def build_workbook(csv_path: Path, output_path: Path, logo_path: Path | None = N
     wb.properties.subject = "Inventory count & discrepancy tracker"
     wb.properties.keywords = "minted, inventory, count, discrepancy, shopify, singles, sealed"
 
+    _p(0.96, "Saving workbook to disk…")
     print(f"Saving to {output_path} ...")
     wb.save(output_path)
     print("Done.")
+    _p(1.0, "Finished.")
 
     return {
         "total": total,
