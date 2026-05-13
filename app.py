@@ -278,11 +278,14 @@ st.markdown(
         background-color: {BRAND_GREEN} !important;
       }}
 
-      /* --- Footer ---------------------------------------------------- */
-      /* Apply Effra / Mulish to all default Streamlit text & widgets too */
-      .stApp, .stApp p, .stApp label, .stApp span, .stApp div,
-      .stApp .stTextInput, .stApp .stDateInput, .stApp .stCaption,
-      div[data-testid="stFileUploader"] * {{
+      /* Apply Effra / Mulish to body text & form widgets. NOTE: we don't
+         use a `*` wildcard inside the file uploader — Streamlit renders
+         its upload icon with a Material Symbols icon font where the
+         literal word "upload" is the ligature. Overriding that font
+         makes the browser render the word as text. */
+      .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4,
+      .stApp h5, .stApp h6, .stApp label, .stApp button, .stApp input,
+      .stApp .stCaption, .stApp [data-testid="stMarkdownContainer"] p {{
         font-family: {BODY_STACK};
       }}
 
@@ -363,20 +366,21 @@ uploaded = st.file_uploader(
     label_visibility="collapsed",
 )
 
-# Defaults for download file naming (used once a file is uploaded or after a build).
+# Defaults for download file naming. Both location AND date are required — date
+# starts empty (None) instead of today() so the user must actively pick one.
 if "inv_export_location" not in st.session_state:
     st.session_state["inv_export_location"] = ""
 if "inv_export_date" not in st.session_state:
-    st.session_state["inv_export_date"] = date.today()
+    st.session_state["inv_export_date"] = None
 
 show_naming = uploaded is not None or "xlsx_bytes" in st.session_state
 
 if show_naming:
     st.markdown(
-        """
+        f"""
         <div class="step-card naming">
           <span class="step-num">Name it</span>
-          <h3>Name your download</h3>
+          <h3>Name your download <span style="color:{GOLD};">*required</span></h3>
           <p>We'll save the workbook as <b>Location</b> + <b>date</b> +
              <code style="font-size:0.85em;">_Daily_Inventory_Log.xlsx</code> — e.g.
              <code style="font-size:0.85em;">Dacula_2026-05-13_Daily_Inventory_Log.xlsx</code>.</p>
@@ -385,15 +389,16 @@ if show_naming:
         unsafe_allow_html=True,
     )
     st.text_input(
-        "Store / location name",
+        "Store / location name *",
         placeholder="e.g. Dacula · Lawrenceville",
         key="inv_export_location",
-        help="Required before building. Unsafe characters become underscores in the file name.",
+        help="Required. Unsafe characters become underscores in the file name.",
     )
     st.date_input(
-        "Date on the file",
+        "Date on the file *",
         key="inv_export_date",
-        help="Usually today, or the day of this count / export.",
+        help="Required. Pick the day of this count / export.",
+        format="YYYY-MM-DD",
     )
 
 # --- Step 3: Build --------------------------------------------------------
@@ -419,44 +424,62 @@ if uploaded is not None:
         unsafe_allow_html=True,
     )
 
-    if st.button("Build Inventory Log", type="primary", use_container_width=True):
-        if not st.session_state.get("inv_export_location", "").strip():
-            st.warning("Enter a **store / location name** first — it's part of the downloaded file name.")
-        else:
-            progress_bar = st.progress(0)
-            status_el = st.empty()
-            try:
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    tmp_csv = Path(tmpdir) / "input.csv"
-                    tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
+    _loc_filled = bool(st.session_state.get("inv_export_location", "").strip())
+    _date_filled = st.session_state.get("inv_export_date") is not None
+    _missing = []
+    if not _loc_filled:
+        _missing.append("store / location name")
+    if not _date_filled:
+        _missing.append("date")
+    _can_build = _loc_filled and _date_filled
 
-                    tmp_csv.write_bytes(uploaded.getvalue())
+    if _missing:
+        st.caption(
+            "Fill in the **"
+            + "** and **".join(_missing)
+            + "** above before building."
+        )
 
-                    def report(frac: float, msg: str) -> None:
-                        progress_bar.progress(frac)
-                        status_el.caption(msg)
+    if st.button(
+        "Build Inventory Log",
+        type="primary",
+        use_container_width=True,
+        disabled=not _can_build,
+    ):
+        progress_bar = st.progress(0)
+        status_el = st.empty()
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp_csv = Path(tmpdir) / "input.csv"
+                tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
 
-                    summary = build_workbook(tmp_csv, tmp_xlsx, progress=report)
-                    xlsx_bytes = tmp_xlsx.read_bytes()
+                tmp_csv.write_bytes(uploaded.getvalue())
 
-                st.session_state["xlsx_bytes"] = xlsx_bytes
-                st.session_state["summary"] = summary
-                st.session_state["built_at"] = datetime.now()
-                progress_bar.progress(1.0)
-                status_el.caption("Done — scroll down to download your workbook.")
-            except InvalidShopifyCsv as e:
-                progress_bar.empty()
-                status_el.empty()
-                st.session_state.pop("xlsx_bytes", None)
-                st.error("⚠️  Wrong file type")
-                st.markdown(str(e).replace("\n", "  \n"))
-            except Exception as e:  # noqa: BLE001 — surface anything else to the user
-                progress_bar.empty()
-                status_el.empty()
-                st.session_state.pop("xlsx_bytes", None)
-                st.error(f"Build failed: {e}")
-                with st.expander("Technical details"):
-                    st.code(traceback.format_exc(), language="text")
+                def report(frac: float, msg: str) -> None:
+                    progress_bar.progress(frac)
+                    status_el.caption(msg)
+
+                summary = build_workbook(tmp_csv, tmp_xlsx, progress=report)
+                xlsx_bytes = tmp_xlsx.read_bytes()
+
+            st.session_state["xlsx_bytes"] = xlsx_bytes
+            st.session_state["summary"] = summary
+            st.session_state["built_at"] = datetime.now()
+            progress_bar.progress(1.0)
+            status_el.caption("Done — scroll down to download your workbook.")
+        except InvalidShopifyCsv as e:
+            progress_bar.empty()
+            status_el.empty()
+            st.session_state.pop("xlsx_bytes", None)
+            st.error("⚠️  Wrong file type")
+            st.markdown(str(e).replace("\n", "  \n"))
+        except Exception as e:  # noqa: BLE001 — surface anything else to the user
+            progress_bar.empty()
+            status_el.empty()
+            st.session_state.pop("xlsx_bytes", None)
+            st.error(f"Build failed: {e}")
+            with st.expander("Technical details"):
+                st.code(traceback.format_exc(), language="text")
 
 
 # --- Step 4: Download -----------------------------------------------------
