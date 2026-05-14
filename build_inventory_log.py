@@ -338,48 +338,101 @@ def build_variant_label(row: dict) -> str:
     return " · ".join(parts)
 
 
-# Columns the Shopify "Inventory" CSV export must contain. If any are missing
-# we bail with a clean error rather than producing an empty workbook.
-REQUIRED_CSV_COLUMNS = (
-    "Handle",
-    "Title",
-    "On hand (current)",
-)
+# Standard columns that appear in *either* Shopify inventory CSV format.
+# Anything not in this set is assumed to be a per-location quantity column
+# in the multi-location export.
+STANDARD_CSV_COLUMNS = frozenset({
+    "Handle", "Title",
+    "Option1 Name", "Option1 Value",
+    "Option2 Name", "Option2 Value",
+    "Option3 Name", "Option3 Value",
+    "SKU", "HS Code", "COO",
+    "Location", "Bin name",
+    "Incoming", "Unavailable", "Committed", "Available",
+    "Incoming (not editable)", "Unavailable (not editable)",
+    "Committed (not editable)", "Available (not editable)",
+    "On hand (current)", "On hand (new)",
+})
 
 
 class InvalidShopifyCsv(ValueError):
     """Raised when the uploaded CSV isn't a Shopify Inventory export."""
 
 
+def _per_location_columns(fieldnames: list[str]) -> list[str]:
+    """Return any non-standard, non-empty columns. In Shopify's multi-location
+    export each row has one column per location whose header is the location
+    name (e.g. "Atlanta", "Dacula") and whose cell holds the on-hand qty for
+    that location. We treat anything outside STANDARD_CSV_COLUMNS as a
+    location column."""
+    return [f for f in fieldnames if f and f.strip() and f not in STANDARD_CSV_COLUMNS]
+
+
 def validate_shopify_csv(csv_path: Path) -> None:
-    """Inspect a CSV's headers and raise InvalidShopifyCsv if it can't be used."""
+    """Accepts both Shopify inventory export formats:
+      - single-location: has 'On hand (current)'
+      - multi-location:  one column per location, named after the location
+    Raises InvalidShopifyCsv if neither shape applies."""
     with open(csv_path, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
 
     fieldset = set(fieldnames)
-    missing = [c for c in REQUIRED_CSV_COLUMNS if c not in fieldset]
-    if missing:
-        hint = (
-            "This doesn't look like a Shopify Inventory export.\n\n"
-            f"Missing required column(s): {', '.join(missing)}\n\n"
-            f"Found columns: {', '.join(fieldnames) or '(none)'}\n\n"
-            "Export the right file from Shopify Admin → Products → Inventory → "
-            "Export → 'CSV for Excel, Numbers, or other spreadsheet programs'."
-        )
-        raise InvalidShopifyCsv(hint)
+    has_handle_title = "Handle" in fieldset and "Title" in fieldset
+    has_unified = "On hand (current)" in fieldset
+    has_per_location = bool(_per_location_columns(fieldnames))
+
+    if has_handle_title and (has_unified or has_per_location):
+        return
+
+    missing_basic = [c for c in ("Handle", "Title") if c not in fieldset]
+    if missing_basic:
+        missing_str = ", ".join(missing_basic)
+    else:
+        missing_str = "On hand (current) (or per-location quantity columns)"
+
+    hint = (
+        "This doesn't look like a Shopify Inventory export.\n\n"
+        f"Missing required column(s): {missing_str}\n\n"
+        f"Found columns: {', '.join(fieldnames) or '(none)'}\n\n"
+        "In Shopify Admin → Products → Inventory → Export, choose either "
+        "'Inventory at this location' (single-location) or 'Inventory at all "
+        "locations' (multi-location) — both formats are accepted. Format must "
+        "be 'CSV for Excel, Numbers, or other spreadsheet programs'."
+    )
+    raise InvalidShopifyCsv(hint)
 
 
 def load_rows(csv_path: Path) -> list[dict]:
     rows: list[dict] = []
     with open(csv_path, "r", newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        location_cols = _per_location_columns(fieldnames)
+        is_per_location = "On hand (current)" not in set(fieldnames)
+
         for raw in reader:
-            on_hand = safe_int(raw.get("On hand (current)"))
-            available = safe_int(raw.get("Available (not editable)"))
-            committed = safe_int(raw.get("Committed (not editable)"))
-            unavailable = safe_int(raw.get("Unavailable (not editable)"))
-            incoming = safe_int(raw.get("Incoming (not editable)"))
+            if is_per_location:
+                # Multi-location export: sum across all per-location columns
+                # for the on-hand total. The other quantities (committed /
+                # available / etc) aren't in this format, so they're zeroed.
+                on_hand = sum(safe_int(raw.get(col)) for col in location_cols)
+                available = on_hand
+                committed = 0
+                unavailable = 0
+                incoming = 0
+                if len(location_cols) == 1:
+                    location = location_cols[0]
+                else:
+                    location = " + ".join(location_cols)
+            else:
+                on_hand = safe_int(raw.get("On hand (current)"))
+                available = safe_int(raw.get("Available (not editable)"))
+                committed = safe_int(raw.get("Committed (not editable)"))
+                unavailable = safe_int(raw.get("Unavailable (not editable)"))
+                incoming = safe_int(raw.get("Incoming (not editable)"))
+                location = raw.get("Location") or ""
+
             title = raw.get("Title") or ""
             sku = (raw.get("SKU") or "").strip()
             rows.append({
@@ -387,7 +440,7 @@ def load_rows(csv_path: Path) -> list[dict]:
                 "title": title,
                 "variant": build_variant_label(raw),
                 "sku": sku,
-                "location": raw.get("Location") or "",
+                "location": location,
                 "bin": raw.get("Bin name") or "",
                 "on_hand": on_hand,
                 "available": available,
