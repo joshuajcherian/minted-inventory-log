@@ -15,8 +15,10 @@ Deploy publicly (free):
 from __future__ import annotations
 
 import base64
+import io
 import tempfile
 import traceback
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -30,6 +32,66 @@ from build_inventory_log import (
 
 
 APP_ROOT = Path(__file__).resolve().parent
+
+
+class CsvExtractError(Exception):
+    """Raised when we can't pull a usable Shopify CSV out of the upload."""
+
+
+def _extract_csv_bytes(uploaded) -> tuple[bytes, str]:
+    """Return (csv_bytes, source_label) for the upload.
+
+    Accepts either a raw .csv or a .zip containing one. For ZIPs we skip
+    macOS metadata (`__MACOSX/`, `.DS_Store`, `._*` resource forks) and
+    prefer entries matching `inventory_export*.csv` if multiple plain
+    CSVs are present. Raises CsvExtractError on ambiguous / empty cases.
+    """
+    name = (uploaded.name or "").lower()
+    raw = uploaded.getvalue()
+
+    if name.endswith(".csv"):
+        return raw, uploaded.name
+
+    if not name.endswith(".zip"):
+        raise CsvExtractError(
+            f"Unsupported file type: **{uploaded.name}**. Upload a `.csv` "
+            f"or a `.zip` containing one."
+        )
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(raw))
+    except zipfile.BadZipFile:
+        raise CsvExtractError(
+            f"**{uploaded.name}** doesn't look like a valid ZIP file. "
+            f"Try downloading it again from Shopify."
+        )
+
+    candidates: list[zipfile.ZipInfo] = []
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        path = info.filename
+        if path.startswith("__MACOSX/") or path.endswith(".DS_Store"):
+            continue
+        basename = path.rsplit("/", 1)[-1]
+        if basename.startswith("._"):  # macOS resource forks
+            continue
+        if not path.lower().endswith(".csv"):
+            continue
+        candidates.append(info)
+
+    if not candidates:
+        raise CsvExtractError(
+            f"No CSV file found inside **{uploaded.name}**. The ZIP needs "
+            f"to contain a Shopify inventory export."
+        )
+
+    # Prefer files matching the Shopify export naming convention.
+    inv_match = [c for c in candidates if "inventory_export" in c.filename.lower()]
+    chosen = inv_match[0] if inv_match else candidates[0]
+
+    csv_bytes = zf.read(chosen)
+    return csv_bytes, f"{uploaded.name} → {chosen.filename}"
 
 
 def _logo_data_uri(filename: str) -> str | None:
@@ -471,16 +533,16 @@ st.markdown(
     """
     <div class="step-card">
       <span class="step-num">Step 2</span>
-      <h3>Upload the CSV</h3>
-      <p>Drag the CSV from your desktop or Downloads — usually the file Shopify emailed you.</p>
+      <h3>Upload the CSV (or the ZIP)</h3>
+      <p>Drag the CSV — or the original Shopify <code>.zip</code>, no need to unzip — from your desktop or Downloads.</p>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 uploaded = st.file_uploader(
-    "Drop your inventory_export*.csv here",
-    type=["csv"],
+    "Drop your inventory_export*.csv or .zip here",
+    type=["csv", "zip"],
     label_visibility="collapsed",
 )
 
@@ -567,11 +629,23 @@ if uploaded is not None:
         progress_bar = st.progress(0)
         status_el = st.empty()
         try:
+            try:
+                csv_bytes, csv_source = _extract_csv_bytes(uploaded)
+            except CsvExtractError as e:
+                progress_bar.empty()
+                status_el.empty()
+                st.session_state.pop("xlsx_bytes", None)
+                st.error(str(e))
+                st.stop()
+
+            if csv_source != uploaded.name:
+                status_el.caption(f"Using **{csv_source}** from your ZIP.")
+
             with tempfile.TemporaryDirectory() as tmpdir:
                 tmp_csv = Path(tmpdir) / "input.csv"
                 tmp_xlsx = Path(tmpdir) / "Minted_Inventory_Log.xlsx"
 
-                tmp_csv.write_bytes(uploaded.getvalue())
+                tmp_csv.write_bytes(csv_bytes)
 
                 def report(frac: float, msg: str) -> None:
                     progress_bar.progress(frac)
