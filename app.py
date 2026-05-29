@@ -304,6 +304,12 @@ st.markdown(
       .step-card.naming  {{ border-left-color: {DEEP_GREEN}; }}
       .step-card.build   {{ border-left-color: {BRAND_GREEN}; }}
       .step-card.success {{ border-left-color: {GOLD}; }}
+      .step-card.report  {{ border-left-color: {DEEP_GREEN}; background: {MINT_WASH}; }}
+      .step-card.report a {{
+        color: {BRAND_GREEN};
+        font-weight: 700;
+        text-decoration: underline;
+      }}
 
       /* --- File uploader -------------------------------------------- */
       div[data-testid="stFileUploader"] section {{
@@ -658,7 +664,7 @@ if uploaded is not None:
             st.session_state["summary"] = summary
             st.session_state["built_at"] = datetime.now()
             progress_bar.progress(1.0)
-            status_el.caption("Done — scroll down to download your workbook.")
+            status_el.caption("Done — scroll down to download, save, and send your daily report.")
         except InvalidShopifyCsv as e:
             progress_bar.empty()
             status_el.empty()
@@ -713,6 +719,49 @@ if "xlsx_bytes" in st.session_state:
         file_name=filename,
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="step-card report">
+          <span class="step-num">Step 5</span>
+          <h3>Save the file &amp; send your daily report</h3>
+          <p style="margin-bottom:14px;">
+            After you download, <b>keep a saved copy</b> and email it to us at the
+            <b>end of every business day</b> — even if everything matched.
+          </p>
+          <p style="margin-bottom:8px; font-weight:700; color:{DEEP_GREEN};">
+            Part A — Save the workbook
+          </p>
+          <ol style="margin:0 0 18px 1.1rem; padding:0; line-height:1.65;">
+            <li style="margin-bottom:10px;">Click <b>Download workbook</b> above.
+                Your browser saves <code style="font-size:0.88em;">{filename}</code>.</li>
+            <li style="margin-bottom:10px;">If a dialog asks what to do with the file,
+                choose <b>Save</b> (not Open).</li>
+            <li style="margin-bottom:10px;">Open your <b>Downloads</b> folder and confirm
+                the file is there. On Mac: Finder → Downloads. On Windows: File Explorer → Downloads.</li>
+            <li style="margin-bottom:10px;">Leave the file name as-is — the store name and date
+                in the name help us file daily reports.</li>
+            <li style="margin-bottom:0;">Optional: move the file to a folder you use for
+                end-of-day store reports so it is easy to find at closing time.</li>
+          </ol>
+          <p style="margin-bottom:8px; font-weight:700; color:{DEEP_GREEN};">
+            Part B — Email it at end of day
+          </p>
+          <ol style="margin:0 0 0 1.1rem; padding:0; line-height:1.65;">
+            <li style="margin-bottom:10px;">At the <b>end of every business day</b>, open your
+                email and start a new message to
+                <a href="mailto:orders@mintedtcg.com?subject=Daily%20Inventory%20Log">orders@mintedtcg.com</a>.</li>
+            <li style="margin-bottom:10px;">Use a subject like
+                <b>Daily Inventory Log — [your store] — [today's date]</b>.</li>
+            <li style="margin-bottom:10px;"><b>Attach</b> the saved <code>.xlsx</code> file
+                from Step A.</li>
+            <li style="margin-bottom:0;">Send the email. This is your required daily inventory
+                report — send it every day you run a count.</li>
+          </ol>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
