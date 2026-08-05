@@ -1,2 +1,5 @@
 streamlit>=1.31
 openpyxl>=3.1
+# Starlette 1.4.0 (2026-08-05) broke Streamlit's GZip middleware:
+# GZipResponder requires thread_minimum_size which Streamlit doesn't pass yet.
+starlette>=1.0,<1.4
